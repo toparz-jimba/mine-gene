@@ -4,26 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-複数プラットフォームと用途に最適化されたマインスイーパーゲームのモノレポです。共通のコアロジックとプラットフォーム固有の実装を持つモジュラーアーキテクチャを使用しています。
+マインスイーパーゲームのモノレポです。現在は単一のPC版実装が中心となっており、共通のコアロジックと機能拡張を持つモジュラーアーキテクチャを使用しています。
 
 ## アーキテクチャ
 
 ### コア構造
-- `/core/minesweeper-core.js` - 共通ゲームロジックを持つベースクラス `MinesweeperCore`
-- `/products/` - コアを拡張する独立したゲームバージョン
-- `/shared/` - 共通アセット、スタイル、ユーティリティ
+- `/minesweeper-core.js` - 共通ゲームロジックを持つベースクラス `MinesweeperCore`  
+- `/pc-base.js` - PC向けベース機能を持つ `PCMinesweeper` クラス
+- `/game.js` - PRO版機能を持つ `PCProMinesweeper` クラス（メイン実装）
+- `/modules/` - 専門モジュール（CSPソルバーなど）
+- `/assets/` - 共通アセット（サウンド、テーマ）
 
-### 製品バージョン
-- `products/mobile/` - スマートフォン向けタッチ最適化版（シンプル版）
-- `products/mobile-pro/` - 商品化向けモバイル版（本格的な機能追加用）
-- `products/pc/` - マウス操作対応のデスクトップ版
-- `products/pc-pro/` - CSPソルバー、テーマ、統計などの高度な機能を持つ上級版
-
-### 主要クラス
+### 主要クラス継承構造
 - `MinesweeperCore` - ベースゲームロジック（タイマー、ボード管理、地雷配置）
-- `MobileMinesweeper` (MinesweeperCoreを継承) - モバイル固有機能
-- `PCMinesweeper` (MinesweeperCoreを継承) - PC固有機能
-- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能を持つPRO版
+- `PCMinesweeper` (MinesweeperCoreを継承) - PC向け基本機能（ズーム、マウス操作）
+- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能（CSPソルバー、統計、リプレイ、カスタムテーマ）
+
+### 専門モジュール
+- `modules/csp-solver.js` - 制約充足問題ソルバー（地雷配置確率計算）
+- `modules/csp-worker.js` - WebWorker対応の並列計算処理
 
 ## 開発コマンド
 
@@ -35,28 +34,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ファイル構造パターン
 
-- 各製品バージョンは独自の `index.html`、`game.js`、`style.css` を持つ
-- コアロジックはHTMLの `<script>` タグで読み込み
-- 製品はロジック重複ではなくコアクラスを拡張
-- 共有アセットは `/shared/` ディレクトリから参照
+- `index.html` - メインHTMLファイル（全クラスを`<script>`タグで読み込み）
+- `minesweeper-core.js` → `pc-base.js` → `game.js` の順でクラス継承
+- モジュール類は `modules/` ディレクトリで独立管理
+- 共有アセットは `assets/` ディレクトリから参照（sounds/, themes/）
 
-## バージョン別主要機能
+## 主要機能
 
-### PC-Pro (`products/pc-pro/`)
-- 確率分析付きCSPソルバー (`modules/csp-solver.js`)
-- カスタムカラースキーム対応テーマシステム
-- 統計追跡とリプレイ機能
-- サウンドエフェクトと高度なUI機能
+### PRO版機能 (`game.js`)
+- **CSPソルバー**: 制約充足問題を用いた地雷配置確率計算 (`modules/csp-solver.js`)
+- **統計機能**: ゲーム記録、勝率、ベストタイム追跡
+- **リプレイ機能**: ゲーム履歴の記録・再生
+- **ヒント機能**: 安全なセルの推奨表示
+- **アンドゥ/リドゥ**: 操作の取り消し・やり直し
+- **カスタムテーマ**: 5種類の色テーマ（クラシック、オーシャン、フォレスト、サンセット、ギャラクシー）
+- **チャレンジモード**: 日次チャレンジとカスタムシード対応
+- **サウンドエフェクト**: ゲーム操作音の対応
+- **ズーム機能**: 0.3倍～3.0倍のスケーリング対応
 
-### Mobile (`products/mobile/`)
-- タッチ最適化コントロール（タップで開く、長押しで旗）
-- 様々な画面サイズに対応するレスポンシブデザイン
-- モバイル操作向けシンプルUI
-
-### Mobile-Pro (`products/mobile-pro/`)
-- Mobile版をベースとした商品化向け高機能版
-- 既存のMobile版は完成品として保持
-- 商品として売り出すための本格的な機能追加・拡張用
+### 基本機能 (`pc-base.js`)
+- 7つの難易度（簡単～極限）+ 隠し難易度3種
+- マウス操作（左クリック：開く、右クリック：旗、ホイール：？マーク）
+- ドラッグ&ドロップでの盤面移動
+- フォントサイズ調整（50%～200%）
 
 ## 重要事項
 
