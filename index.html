@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインスイーパー PC PRO版</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="flag-animation-container"></div>
+    <div class="container">
+        <header class="game-header">
+            <div class="info-panel">
+                <div class="info-item-group">
+                    <div class="info-item">
+                        <span class="emoji">🚩</span>
+                        <span id="flag-count">0/10</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="emoji">💣</span>
+                        <span id="mine-remaining">10</span>
+                    </div>
+                </div>
+                <div class="center-group">
+                    <button id="reset-btn" class="reset-btn">😊</button>
+                </div>
+                <div class="timer-group">
+                    <div class="displays-container">
+                        <div class="assist-display-container"></div>
+                        <div class="global-stats-display-container"></div>
+                    </div>
+                    <div class="info-item">
+                        <span class="emoji">⏱️</span>
+                        <span id="timer">000</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-board-wrapper">
+            <div class="game-board" id="game-board"></div>
+        </div>
+        
+        <div class="controls">
+            <button id="flag-mode-btn" class="control-btn">
+                <span class="mode-icon">🚩</span>
+            </button>
+            <div class="zoom-controls">
+                <button id="zoom-out-btn" class="zoom-btn">－</button>
+                <button id="zoom-in-btn" class="zoom-btn">＋</button>
+            </div>
+            <button id="settings-btn" class="control-btn">
+                <span class="settings-icon">⚙️</span>
+            </button>
+            
+            <!-- PRO版専用コントロール -->
+            <div class="pro-controls">
+                <button id="stats-btn" class="control-btn pro-btn" title="統計">
+                    <span>📊</span>
+                </button>
+                <button id="hint-btn" class="control-btn pro-btn" title="ヒント">
+                    <span>💡 ヒント (3)</span>
+                </button>
+                <button id="undo-btn" class="control-btn pro-btn" title="元に戻す (Ctrl+Z)">
+                    <span>↩️</span>
+                </button>
+                <button id="redo-btn" class="control-btn pro-btn" title="やり直す (Ctrl+Y)">
+                    <span>↪️</span>
+                </button>
+                <button id="replay-btn" class="control-btn pro-btn" title="リプレイ">
+                    <span>▶ リプレイ</span>
+                </button>
+                <button id="challenge-btn" class="control-btn pro-btn" title="チャレンジモード">
+                    <span>🏆</span>
+                </button>
+                <button id="probability-btn" class="control-btn pro-btn" title="地雷確率表示">
+                    <span>🎲 確率</span>
+                </button>
+                <button id="assist-btn" class="control-btn pro-btn" title="補助モード">
+                    <span>🎯 補助</span>
+                </button>
+            </div>
+        </div>
+
+        <button id="help-btn" class="help-btn-floating">
+            <span class="help-icon">？</span>
+        </button>
+
+        <div class="settings-modal" id="settings-modal">
+            <div class="settings-modal-content">
+                <div class="settings-header">
+                    <h2>設定</h2>
+                    <button id="close-settings" class="close-btn">✕</button>
+                </div>
+                <div class="settings-body">
+                    <div class="settings-section">
+                        <h3>難易度</h3>
+                        <select id="difficulty-select" class="difficulty-select-modal">
+                            <option value="easy" selected>初級 (9×9, 地雷10)</option>
+                            <option value="medium">中級 (16×16, 地雷40)</option>
+                            <option value="hard">上級 (16×30, 地雷99)</option>
+                            <option value="hiddeneasy">裏初級 (9×9, 地雷20)</option>
+                            <option value="hiddenmedium">裏中級 (16×16, 地雷64)</option>
+                            <option value="hiddenhard">裏上級 (16×30, 地雷120)</option>
+                            <option value="extreme">極悪 (64×64, 地雷999)</option>
+                        </select>
+                    </div>
+                    <div class="settings-section">
+                        <h3>文字サイズ</h3>
+                        <div class="settings-controls">
+                            <button id="font-size-down-btn" class="settings-btn">小</button>
+                            <span id="font-size-display" class="settings-value">100%</span>
+                            <button id="font-size-up-btn" class="settings-btn">大</button>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>テーマ</h3>
+                        <button id="theme-toggle-btn" class="settings-toggle-btn">
+                            <span class="theme-icon">☀️</span>
+                            <span class="theme-text">ライトモード</span>
+                        </button>
+                        <div class="pro-theme-section">
+                            <h4>PROテーマ</h4>
+                            <select id="theme-select" class="theme-select">
+                                <option value="classic">クラシック</option>
+                                <option value="ocean">オーシャン</option>
+                                <option value="forest">フォレスト</option>
+                                <option value="sunset">サンセット</option>
+                                <option value="galaxy">ギャラクシー</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h3>旗アニメーション</h3>
+                        <button id="flag-animation-toggle-btn" class="settings-toggle-btn">
+                            <span class="flag-animation-icon">🚩</span>
+                            <span class="flag-animation-text">ON</span>
+                        </button>
+                    </div>
+                    <div class="settings-section">
+                        <h3>サウンド</h3>
+                        <button id="sound-toggle" class="settings-toggle-btn">
+                            <span>🔇</span>
+                        </button>
+                    </div>
+                    <div class="settings-section">
+                        <h3>グラデーション・影</h3>
+                        <button id="power-save-toggle-btn" class="settings-toggle-btn">
+                            <span class="power-save-icon">🎨</span>
+                            <span class="power-save-text">ON</span>
+                        </button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">OFFで消費電力を削減</p>
+                    </div>
+                    <div class="settings-section">
+                        <h3>補助機能の色付け表示</h3>
+                        <button id="assist-visual-toggle-btn" class="settings-toggle-btn">
+                            <span class="assist-visual-icon">🎨</span>
+                            <span class="assist-visual-text">ON</span>
+                        </button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">OFFの時は補助機能のポップアップのみ使用</p>
+                    </div>
+                    <div class="settings-section">
+                        <h3>リバース操作</h3>
+                        <button id="reverse-toggle-btn" class="settings-toggle-btn">
+                            <span class="reverse-icon">🔄</span>
+                            <span class="reverse-text">OFF</span>
+                        </button>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">スワイプ操作を反転します</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="help-modal" id="help-modal">
+            <div class="help-modal-content">
+                <div class="help-header">
+                    <h2>操作説明</h2>
+                    <button id="close-help" class="close-btn">✕</button>
+                </div>
+                <div class="help-body">
+                    <div class="help-section" id="mobile-help">
+                        <h3>📱 スマートフォン・タブレット</h3>
+                        <div class="help-item">
+                            <span class="help-action">タップ</span>
+                            <span class="help-description">マスを開く</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">長押し</span>
+                            <span class="help-description">旗を立てる/外す</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">🚩ボタン</span>
+                            <span class="help-description">旗モードの切り替え（ONの時はタップで旗）</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">＋/－ボタン</span>
+                            <span class="help-description">拡大・縮小</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">スワイプ</span>
+                            <span class="help-description">ボードを移動（拡大時）</span>
+                        </div>
+                    </div>
+                    <div class="help-section" id="pc-help">
+                        <h3>💻 パソコン</h3>
+                        <div class="help-item">
+                            <span class="help-action">左クリック</span>
+                            <span class="help-description">マスを開く</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">右クリック</span>
+                            <span class="help-description">旗を立てる/外す</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">🚩ボタン</span>
+                            <span class="help-description">旗モードの切り替え（ONの時は左クリックで旗）</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">＋/－ボタン</span>
+                            <span class="help-description">拡大・縮小</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-action">中ボタンでドラッグ</span>
+                            <span class="help-description">ボードを移動（拡大時）</span>
+                        </div>
+                    </div>
+                    <div class="help-section">
+                        <h3>🎮 ゲームルール</h3>
+                        <p>地雷を避けながらすべての安全なマスを開くゲームです。数字は周囲8マスの地雷数を示します。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ゲームクリアモーダル -->
+    <div id="clear-modal" class="modal">
+        <div class="modal-content clear-modal-content">
+            <div class="clear-modal-header">
+                <span class="clear-icon">🎉</span>
+                <h2>クリア！</h2>
+            </div>
+            <p id="clear-message" class="clear-message"></p>
+            <div class="clear-modal-buttons">
+                <button id="next-difficulty-btn" class="clear-btn next-btn">次の難易度へ</button>
+                <button id="replay-difficulty-btn" class="clear-btn replay-btn">もう一度プレイ</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PRO版専用モーダル -->
+    <!-- 統計モーダル -->
+    <div id="stats-modal" class="modal">
+        <div class="modal-content stats-modal-content">
+            <div id="stats-content"></div>
+        </div>
+    </div>
+    
+    <!-- チャレンジモーダル -->
+    <div id="challenge-modal" class="modal">
+        <div class="modal-content challenge-modal-content">
+            <div id="challenge-content"></div>
+        </div>
+    </div>
+    
+    <!-- スピードラン完了モーダル -->
+    <div id="speedrun-complete-modal" class="modal">
+        <div class="modal-content speedrun-modal-content">
+            <div id="speedrun-content"></div>
+        </div>
+    </div>
+    
+    <script src="minesweeper-core.js"></script>
+    <script src="pc-base.js"></script>
+    <script src="modules/csp-solver.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
