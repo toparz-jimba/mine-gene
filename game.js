@@ -5,19 +5,7 @@ class PCProMinesweeper extends PCMinesweeper {
         
         // PRO版専用の機能
         
-        // カスタムテーマ
-        this.customThemes = {
-            classic: { name: 'クラシック', primary: '#2196F3', secondary: '#FF9800' },
-            ocean: { name: 'オーシャン', primary: '#006994', secondary: '#00ACC1' },
-            forest: { name: 'フォレスト', primary: '#2E7D32', secondary: '#66BB6A' },
-            sunset: { name: 'サンセット', primary: '#E65100', secondary: '#FFB74D' },
-            galaxy: { name: 'ギャラクシー', primary: '#4A148C', secondary: '#AB47BC' }
-        };
-        this.currentTheme = 'classic';
         
-        // サウンド設定
-        this.soundEnabled = false;
-        this.sounds = {};
         
         // CSPソルバー
         this.cspSolver = null;
@@ -34,7 +22,6 @@ class PCProMinesweeper extends PCMinesweeper {
     initPro() {
         this.loadSettings();
         this.setupProEventListeners();
-        this.initSounds();
         this.initCSPSolver();
     }
     
@@ -44,17 +31,8 @@ class PCProMinesweeper extends PCMinesweeper {
         
         
         
-        // テーマ選択
-        const themeSelect = document.getElementById('theme-select');
-        if (themeSelect) {
-            themeSelect.addEventListener('change', (e) => this.applyTheme(e.target.value));
-        }
         
         // サウンドトグル
-        const soundToggle = document.getElementById('sound-toggle');
-        if (soundToggle) {
-            soundToggle.addEventListener('click', () => this.toggleSound());
-        }
         
         // 確率表示ボタン
         const probabilityBtn = document.getElementById('probability-btn');
@@ -101,67 +79,6 @@ class PCProMinesweeper extends PCMinesweeper {
         return neighbors;
     }
     
-    // サウンド機能
-    initSounds() {
-        // Web Audio APIを使用した簡単なサウンド生成
-        if (window.AudioContext || window.webkitAudioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
-    
-    playSound(type) {
-        if (!this.soundEnabled || !this.audioContext) return;
-        
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        switch(type) {
-            case 'reveal':
-                oscillator.frequency.value = 600;
-                gainNode.gain.value = 0.1;
-                break;
-            case 'flag':
-                oscillator.frequency.value = 800;
-                gainNode.gain.value = 0.1;
-                break;
-            case 'win':
-                oscillator.frequency.value = 1000;
-                gainNode.gain.value = 0.2;
-                break;
-            case 'lose':
-                oscillator.frequency.value = 200;
-                gainNode.gain.value = 0.2;
-                break;
-        }
-        
-        oscillator.start(this.audioContext.currentTime);
-        oscillator.stop(this.audioContext.currentTime + 0.1);
-    }
-    
-    toggleSound() {
-        this.soundEnabled = !this.soundEnabled;
-        const soundToggle = document.getElementById('sound-toggle');
-        if (soundToggle) {
-            soundToggle.textContent = this.soundEnabled ? '🔊' : '🔇';
-        }
-        localStorage.setItem('minesweeper-pro-sound', this.soundEnabled);
-    }
-    
-    // テーマ機能
-    applyTheme(themeName) {
-        if (!this.customThemes[themeName]) return;
-        
-        this.currentTheme = themeName;
-        const theme = this.customThemes[themeName];
-        
-        document.documentElement.style.setProperty('--theme-primary', theme.primary);
-        document.documentElement.style.setProperty('--theme-secondary', theme.secondary);
-        
-        localStorage.setItem('minesweeper-pro-theme', themeName);
-    }
     
     // 補助機能の視覚表示設定切り替え
     toggleAssistVisual() {
@@ -183,26 +100,6 @@ class PCProMinesweeper extends PCMinesweeper {
     
     // 設定の保存と読み込み
     loadSettings() {
-        // サウンド設定
-        const soundSetting = localStorage.getItem('minesweeper-pro-sound');
-        if (soundSetting === 'true') {
-            this.soundEnabled = true;
-            const soundToggle = document.getElementById('sound-toggle');
-            if (soundToggle) {
-                soundToggle.textContent = '🔊';
-            }
-        }
-        
-        // テーマ設定
-        const themeSetting = localStorage.getItem('minesweeper-pro-theme');
-        if (themeSetting && this.customThemes[themeSetting]) {
-            this.applyTheme(themeSetting);
-            const themeSelect = document.getElementById('theme-select');
-            if (themeSelect) {
-                themeSelect.value = themeSetting;
-            }
-        }
-        
         // 補助機能の視覚表示設定
         const assistVisualSetting = localStorage.getItem('minesweeper-pro-assist-visual');
         if (assistVisualSetting === 'false') {
@@ -472,47 +369,44 @@ class PCProMinesweeper extends PCMinesweeper {
         this.showAssistPopup(probabilities);
     }
     
-    clearAssistDisplay() {
+    updateAssistDisplay(minProbability, hasCertainMine) {
         let display = document.querySelector('.assist-display');
         if (!display) {
             display = document.createElement('div');
             display.className = 'assist-display';
-            const container = document.querySelector('.assist-display-container');
-            if (container) {
-                container.appendChild(display);
+            const gameContainer = document.querySelector('.game-container') || document.querySelector('.container');
+            if (gameContainer) {
+                gameContainer.appendChild(display);
             } else {
                 document.body.appendChild(display);
             }
         }
         
-        let statusText = '';
-        
         if (minProbability === 101) {
             // 確率が計算できない場合は表示しない
-            display.classList.remove('show');
+            display.style.display = 'none';
             return;
-        } else {
-            statusText = `${minProbability}%`;
-            // 盤面上に100%のセルがある場合は💣を追加
-            if (hasCertainMine) {
-                statusText += ' 💣';
-            }
         }
         
-        display.innerHTML = `
-            <div class="assist-content ${assistClass}">
-                <span class="assist-text">${statusText}</span>
-            </div>
-        `;
-        display.classList.add('show');
+        let statusText = `${minProbability}%`;
+        if (hasCertainMine) {
+            statusText += ' 💣';
+        }
+        
+        display.innerHTML = `<span class="assist-text">${statusText}</span>`;
+        display.style.display = 'block';
+    }
+    
+    hideAssistDisplay() {
+        const display = document.querySelector('.assist-display');
+        if (display) {
+            display.style.display = 'none';
+        }
     }
     
     clearAssistDisplay() {
         // 補助表示を非表示
-        const display = document.querySelector('.assist-display');
-        if (display) {
-            display.classList.remove('show');
-        }
+        this.hideAssistDisplay();
         
         // 視覚表示が無効な場合は色付け・アルファベット表示のクリアは不要
         if (!this.assistVisualEnabled) {
@@ -627,7 +521,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 assistClass = 'probability';
             } else {
                 // スキップされたセルもない場合は表示しない
-                display.classList.remove('show');
+                display.style.display = 'none';
                 return;
             }
         } else if (displayProbability === 0) {
@@ -649,12 +543,8 @@ class PCProMinesweeper extends PCMinesweeper {
             statusText += ' 組み合わせ超過';
         }
         
-        display.innerHTML = `
-            <div class="assist-content ${assistClass}">
-                <span class="assist-text">${statusText}</span>
-            </div>
-        `;
-        display.classList.add('show');
+        display.innerHTML = `<span class="assist-text">${statusText}</span>`;
+        display.style.display = 'block';
     }
     
     calculateAndDisplayProbabilities() {
@@ -829,25 +719,27 @@ class PCProMinesweeper extends PCMinesweeper {
         if (!display) {
             display = document.createElement('div');
             display.className = 'global-probability-display';
-            document.body.appendChild(display);
+            // ゲームコンテナ内に配置
+            const gameContainer = document.querySelector('.game-container') || document.querySelector('.container');
+            if (gameContainer) {
+                gameContainer.appendChild(display);
+            } else {
+                document.body.appendChild(display);
+            }
         }
         
         const flaggedCount = this.countFlags();
         const remainingMines = this.mineCount - flaggedCount;
         const unknownCount = this.getUnknownCells().length;
         
-        display.innerHTML = `
-            <div class="global-prob-content">
-                <div class="global-prob-value">平均確率: ${globalProbability}%</div>
-            </div>
-        `;
-        display.classList.add('show');
+        display.innerHTML = `<span class="global-prob-value">平均確率: ${globalProbability}%</span>`;
+        display.style.display = 'block';
     }
     
     hideGlobalProbabilityDisplay() {
-        const display = document.querySelector('.global-stats-display-container .global-probability-display');
+        const display = document.querySelector('.global-probability-display');
         if (display) {
-            display.classList.remove('show');
+            display.style.display = 'none';
         }
     }
     

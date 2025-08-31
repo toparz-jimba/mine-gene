@@ -13,12 +13,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `/pc-base.js` - PC向けベース機能を持つ `PCMinesweeper` クラス
 - `/game.js` - PRO版機能を持つ `PCProMinesweeper` クラス（メイン実装）
 - `/modules/` - 専門モジュール（CSPソルバーなど）
-- `/assets/` - 共通アセット（サウンド、テーマ）
+- `/assets/` - 共通アセット
 
 ### 主要クラス継承構造
 - `MinesweeperCore` - ベースゲームロジック（タイマー、ボード管理、地雷配置）
 - `PCMinesweeper` (MinesweeperCoreを継承) - PC向け基本機能（ズーム、マウス操作）
-- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能（CSPソルバー、カスタムテーマ）
+- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能（CSPソルバー）
 
 ### 専門モジュール
 - `modules/csp-solver.js` - 制約充足問題ソルバー（地雷配置確率計算）
@@ -37,14 +37,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `index.html` - メインHTMLファイル（全クラスを`<script>`タグで読み込み）
 - `minesweeper-core.js` → `pc-base.js` → `game.js` の順でクラス継承
 - モジュール類は `modules/` ディレクトリで独立管理
-- 共有アセットは `assets/` ディレクトリから参照（sounds/, themes/）
+- 共有アセットは `assets/` ディレクトリから参照
 
 ## 主要機能
 
 ### PRO版機能 (`game.js`)
 - **CSPソルバー**: 制約充足問題を用いた地雷配置確率計算 (`modules/csp-solver.js`)
-- **カスタムテーマ**: 5種類の色テーマ（クラシック、オーシャン、フォレスト、サンセット、ギャラクシー）
-- **サウンドエフェクト**: ゲーム操作音の対応
 - **ズーム機能**: 0.3倍～3.0倍のスケーリング対応
 
 ### 基本機能 (`pc-base.js`)

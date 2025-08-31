@@ -15,9 +15,6 @@
     --modal-bg: rgba(0, 0, 0, 0.7);
     --modal-content-bg: white;
     
-    /* PRO版テーマカラー */
-    --theme-primary: #2196F3;
-    --theme-secondary: #FF9800;
     --pro-accent: #FFD700;
     --pro-bg: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
 }
@@ -928,24 +925,6 @@ body.power-save-mode .control-btn.active {
     justify-content: center;
 }
 
-.pro-btn {
-    background: linear-gradient(145deg, var(--theme-primary), var(--theme-secondary));
-    color: white;
-    font-size: 14px;
-    padding: 8px 12px;
-    min-width: auto;
-    white-space: nowrap;
-}
-
-.pro-btn:hover {
-    opacity: 0.9;
-    transform: translateY(-2px);
-}
-
-.pro-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 
 /* PRO版モーダル共通スタイル */
@@ -974,25 +953,6 @@ body.power-save-mode .control-btn.active {
 
 
 
-/* PROテーマセレクト */
-.pro-theme-section {
-    margin-top: 15px;
-}
-
-.pro-theme-section h4 {
-    font-size: 14px;
-    margin-bottom: 8px;
-    color: var(--pro-accent);
-}
-
-.theme-select {
-    width: 100%;
-    padding: 8px;
-    border-radius: 5px;
-    background: var(--panel-bg);
-    color: var(--text-primary);
-    border: 1px solid var(--cell-border);
-}
 
 /* スピードランモーダル */
 .speedrun-modal-content {
@@ -1107,17 +1067,6 @@ body.power-save-mode .control-btn.active {
     display: none;
 }
 
-/* 確率ボタンアクティブ状態 */
-#probability-btn.active {
-    background: linear-gradient(145deg, var(--pro-accent), var(--theme-secondary));
-    transform: scale(1.05);
-}
-
-/* 補助ボタンアクティブ状態 */
-#assist-btn.active {
-    background: linear-gradient(145deg, var(--pro-accent), var(--theme-secondary));
-    transform: scale(1.05);
-}
 
 /* 確率計算中インジケーター */
 .calculating-indicator {
@@ -1152,7 +1101,7 @@ body.power-save-mode .control-btn.active {
     width: 20px;
     height: 20px;
     border: 3px solid var(--panel-bg);
-    border-top: 3px solid var(--theme-primary);
+    border-top: 3px solid var(--pro-accent);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-left: 10px;
@@ -1160,6 +1109,9 @@ body.power-save-mode .control-btn.active {
 
 /* 全体統計確率表示 */
 .global-probability-display {
+    position: absolute;
+    top: 20px;
+    right: 20px;
     background: var(--modal-content-bg);
     padding: 8px 12px;
     border-radius: 10px;
@@ -1167,6 +1119,7 @@ body.power-save-mode .control-btn.active {
     z-index: 100;
     display: none;
     min-width: 100px;
+    max-width: 150px;
 }
 
 .global-probability-display.show {
@@ -1224,7 +1177,7 @@ body.power-save-mode .control-btn.active {
 .global-prob-value {
     font-size: 12px;
     font-weight: bold;
-    color: var(--theme-secondary);
+    color: var(--text-primary);
     margin: 0;
     padding: 0;
 }
@@ -1232,6 +1185,9 @@ body.power-save-mode .control-btn.active {
 
 /* 補助表示パネル */
 .assist-display {
+    position: absolute;
+    top: 25px;
+    right: 180px;
     background: var(--modal-content-bg);
     padding: 8px 12px;
     border-radius: 10px;
@@ -1239,6 +1195,7 @@ body.power-save-mode .control-btn.active {
     z-index: 100;
     display: none;
     min-width: 70px;
+    max-width: 150px;
 }
 
 .assist-display-container {
@@ -1248,13 +1205,6 @@ body.power-save-mode .control-btn.active {
     height: 40px;
 }
 
-.assist-display-container .assist-display {
-    position: static;
-}
-
-.assist-display.show {
-    display: block;
-}
 
 .assist-content {
     display: flex;
