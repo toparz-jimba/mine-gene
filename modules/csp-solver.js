@@ -616,7 +616,7 @@ class CSPSolver {
         
         console.log(`[LOCAL COMPLETENESS] Solving independent subset: ${subsetCells.length} cells, ${subset.constraints.length} constraints`);
         
-        // 完全探索を実行
+        // 完全探索を実行（早期確定判定付き）
         const validConfigurations = [];
         const totalConfigs = Math.pow(2, subsetCells.length);
         
@@ -625,7 +625,12 @@ class CSPSolver {
         this.totalExhaustiveSearches += 1;
         this.totalCellsProcessed += subsetCells.length;
         
-        // すべての可能な配置を試す
+        // 早期確定判定用の配列（各セルが確定したかを追跡）
+        const cellStatus = new Array(subsetCells.length).fill('unknown'); // 'unknown', 'always_mine', 'always_safe', 'mixed'
+        let foundActionable = false;
+        let validConfigCount = 0;
+        
+        // すべての可能な配置を試す（早期確定判定付き）
         for (let config = 0; config < totalConfigs; config++) {
             const mines = [];
             for (let i = 0; i < subsetCells.length; i++) {
@@ -636,6 +641,47 @@ class CSPSolver {
             
             if (this.isValidConfigurationForSubset(mines, subset.constraints)) {
                 validConfigurations.push(mines);
+                validConfigCount++;
+                
+                // 早期確定判定：各セルの状態を更新
+                for (let i = 0; i < subsetCells.length; i++) {
+                    const isMine = mines.includes(i);
+                    
+                    if (cellStatus[i] === 'unknown') {
+                        // 初回の有効パターン
+                        cellStatus[i] = isMine ? 'always_mine' : 'always_safe';
+                    } else if (
+                        (cellStatus[i] === 'always_mine' && !isMine) ||
+                        (cellStatus[i] === 'always_safe' && isMine)
+                    ) {
+                        // 状態が変わった → 混在状態
+                        cellStatus[i] = 'mixed';
+                    }
+                }
+                
+                // 早期確定判定：確定マスが見つかったかチェック
+                if (validConfigCount >= 2) { // 最低2パターンは見てから判定
+                    let hasNewActionable = false;
+                    for (let i = 0; i < subsetCells.length; i++) {
+                        if (cellStatus[i] === 'always_mine' || cellStatus[i] === 'always_safe') {
+                            hasNewActionable = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasNewActionable && !foundActionable) {
+                        foundActionable = true;
+                        console.log(`[EARLY TERMINATION] Found actionable cells after ${validConfigCount} valid patterns (${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
+                    }
+                    
+                    // 全セル確定チェック：すべてのセルが確定したら早期終了
+                    const allCellsDetermined = cellStatus.every(status => status !== 'unknown' && status !== 'mixed');
+                    if (allCellsDetermined) {
+                        console.log(`[EARLY TERMINATION] All cells determined after ${validConfigCount} valid patterns. Stopping early.`);
+                        this.totalConfigurations = config + 1; // 実際に処理したパターン数に更新
+                        break;
+                    }
+                }
             }
         }
         
