@@ -6,6 +6,7 @@ class CSPSolver {
         this.game = game;
         this.probabilities = [];
         this.persistentProbabilities = []; // 0%と100%の確率を永続的に保持
+        this.timedOutCells = []; // タイムアウトされたセルの情報
         this.maxConstraintSize = 25; // 完全探索の最大サイズ
         this.maxLocalCompletenessSize = 200; // 局所制約完全性処理の最大サイズ（大幅緩和）
         this.warningThreshold = 30; // 警告を表示するセル数の閾値
@@ -39,6 +40,7 @@ class CSPSolver {
         this.constraintPropagationOnly = 0;
         this.localCompletenessSuccess = 0;
         this.totalCellsProcessed = 0;
+        this.timedOutCells = []; // タイムアウトセルを初期化
         
         const rows = this.game.rows;
         const cols = this.game.cols;
@@ -92,7 +94,7 @@ class CSPSolver {
                     this.probabilities[cell.row][cell.col] = -2;
                 }
             }
-            return { probabilities: this.probabilities, globalProbability };
+            return { probabilities: this.probabilities, globalProbability, timedOutCells: this.timedOutCells };
         }
         
         // 制約グループに分割
@@ -271,7 +273,7 @@ class CSPSolver {
         // 注意: 既にフェーズ2で実行済みの場合は重複を避ける
         // this.markMineCandidatesForConfirmedSafes(borderCells); // 重複処理のため一時コメントアウト
         
-        return { probabilities: this.probabilities, globalProbability };
+        return { probabilities: this.probabilities, globalProbability, timedOutCells: this.timedOutCells };
     }
     
     // スキップされたグループにキャッシュから確率を復元
@@ -706,35 +708,49 @@ class CSPSolver {
         let hasActionableCell = false;
         if (validConfigurations.length > 0) {
             if (timedOut) {
-                console.log(`[TIMEOUT] Using partial results from ${validConfigurations.length} valid configurations`);
-            }
-            
-            for (let i = 0; i < subsetCells.length; i++) {
-                let mineCount = 0;
-                for (const config of validConfigurations) {
-                    if (config.includes(i)) {
-                        mineCount++;
-                    }
+                console.log(`[TIMEOUT] Partial results from ${validConfigurations.length} valid configurations - hiding probabilities for incomplete calculations`);
+                // タイムアウト時は確率を非表示にする（-1で未計算状態を維持）
+                for (const cell of subsetCells) {
+                    this.probabilities[cell.row][cell.col] = -1;
+                    // タイムアウトセルとして記録
+                    this.timedOutCells.push({ row: cell.row, col: cell.col });
                 }
-                const probability = Math.round((mineCount / validConfigurations.length) * 100);
-                const cell = subsetCells[i];
-                this.probabilities[cell.row][cell.col] = probability;
-                
-                // 0%または100%の場合は永続的に保存
-                if (probability === 0 || probability === 100) {
-                    this.persistentProbabilities[cell.row][cell.col] = probability;
-                    hasActionableCell = true;
+            } else {
+                // 正常完了時のみ確率を計算・表示
+                for (let i = 0; i < subsetCells.length; i++) {
+                    let mineCount = 0;
+                    for (const config of validConfigurations) {
+                        if (config.includes(i)) {
+                            mineCount++;
+                        }
+                    }
+                    const probability = Math.round((mineCount / validConfigurations.length) * 100);
+                    const cell = subsetCells[i];
+                    this.probabilities[cell.row][cell.col] = probability;
+                    
+                    // 0%または100%の場合は永続的に保存
+                    if (probability === 0 || probability === 100) {
+                        this.persistentProbabilities[cell.row][cell.col] = probability;
+                        hasActionableCell = true;
+                    }
                 }
             }
         } else {
             // 有効な配置がない場合（エラー状態またはタイムアウト）
             if (timedOut) {
-                console.warn('Timed out before finding any valid configurations. Using default probabilities.');
+                console.warn('Timed out before finding any valid configurations. Hiding probabilities.');
+                // タイムアウト時は確率を非表示にする
+                for (const cell of subsetCells) {
+                    this.probabilities[cell.row][cell.col] = -1;
+                    // タイムアウトセルとして記録
+                    this.timedOutCells.push({ row: cell.row, col: cell.col });
+                }
             } else {
                 console.warn('No valid configurations found for independent subset');
-            }
-            for (const cell of subsetCells) {
-                this.probabilities[cell.row][cell.col] = 50; // デフォルト値
+                // エラー状態のみデフォルト値を使用
+                for (const cell of subsetCells) {
+                    this.probabilities[cell.row][cell.col] = 50;
+                }
             }
         }
         
@@ -1471,35 +1487,57 @@ class CSPSolver {
         let hasActionableCell = false;
         if (validConfigurations.length > 0) {
             if (timedOut) {
-                console.log(`[TIMEOUT] Using partial results from ${validConfigurations.length} valid configurations`);
-            }
-            for (let i = 0; i < uncertainGroup.length; i++) {
-                let mineCount = 0;
-                for (const config of validConfigurations) {
-                    if (config.includes(i)) {
-                        mineCount++;
-                    }
+                console.log(`[TIMEOUT] Partial results from ${validConfigurations.length} valid configurations - hiding probabilities for incomplete calculations`);
+                // タイムアウト時は確率を非表示にする（-1で未計算状態を維持）
+                for (let i = 0; i < uncertainGroup.length; i++) {
+                    const originalIdx = originalIndices[i];
+                    const row = fullGroup[originalIdx].row;
+                    const col = fullGroup[originalIdx].col;
+                    this.probabilities[row][col] = -1;
+                    // タイムアウトセルとして記録
+                    this.timedOutCells.push({ row: row, col: col });
                 }
-                const probability = Math.round((mineCount / validConfigurations.length) * 100);
-                const originalIdx = originalIndices[i];
-                const row = fullGroup[originalIdx].row;
-                const col = fullGroup[originalIdx].col;
-                this.probabilities[row][col] = probability;
-                
-                // 0%または100%の場合は永続的に保存
-                if (probability === 0 || probability === 100) {
-                    this.persistentProbabilities[row][col] = probability;
-                    hasActionableCell = true;
+            } else {
+                // 正常完了時のみ確率を計算・表示
+                for (let i = 0; i < uncertainGroup.length; i++) {
+                    let mineCount = 0;
+                    for (const config of validConfigurations) {
+                        if (config.includes(i)) {
+                            mineCount++;
+                        }
+                    }
+                    const probability = Math.round((mineCount / validConfigurations.length) * 100);
+                    const originalIdx = originalIndices[i];
+                    const row = fullGroup[originalIdx].row;
+                    const col = fullGroup[originalIdx].col;
+                    this.probabilities[row][col] = probability;
+                    
+                    // 0%または100%の場合は永続的に保存
+                    if (probability === 0 || probability === 100) {
+                        this.persistentProbabilities[row][col] = probability;
+                        hasActionableCell = true;
+                    }
                 }
             }
         } else {
             // デフォルト値（エラー状態またはタイムアウト）
             if (timedOut) {
-                console.warn('Timed out before finding any valid configurations. Using default probabilities.');
-            }
-            for (let i = 0; i < uncertainGroup.length; i++) {
-                const originalIdx = originalIndices[i];
-                this.probabilities[fullGroup[originalIdx].row][fullGroup[originalIdx].col] = 50;
+                console.warn('Timed out before finding any valid configurations. Hiding probabilities.');
+                // タイムアウト時は確率を非表示にする
+                for (let i = 0; i < uncertainGroup.length; i++) {
+                    const originalIdx = originalIndices[i];
+                    const row = fullGroup[originalIdx].row;
+                    const col = fullGroup[originalIdx].col;
+                    this.probabilities[row][col] = -1;
+                    // タイムアウトセルとして記録
+                    this.timedOutCells.push({ row: row, col: col });
+                }
+            } else {
+                // エラー状態のみデフォルト値を使用
+                for (let i = 0; i < uncertainGroup.length; i++) {
+                    const originalIdx = originalIndices[i];
+                    this.probabilities[fullGroup[originalIdx].row][fullGroup[originalIdx].col] = 50;
+                }
             }
         }
         return hasActionableCell;

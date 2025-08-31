@@ -255,6 +255,10 @@ class PCProMinesweeper extends PCMinesweeper {
             // 永続確率と通常確率をマージして表示用の確率を作成
             const displayProbabilities = this.mergeWithPersistentProbabilities(result.probabilities);
             this.displayAssist(displayProbabilities);
+            // タイムアウトセルがあれば色付け
+            if (result.timedOutCells && result.timedOutCells.length > 0) {
+                this.highlightTimeoutCells(result.timedOutCells);
+            }
             this.hideCalculatingIndicator();
         }, 10);
     }
@@ -440,6 +444,37 @@ class PCProMinesweeper extends PCMinesweeper {
                                     'mine-candidate');
             });
         }
+        
+        // タイムアウトハイライトもクリア
+        this.clearTimeoutHighlight();
+    }
+    
+    // タイムアウトされたセルをハイライト
+    highlightTimeoutCells(timedOutCells) {
+        console.log(`Highlighting ${timedOutCells.length} timeout cells`);
+        
+        if (!this.boardElement || !timedOutCells || timedOutCells.length === 0) return;
+        
+        timedOutCells.forEach(cellInfo => {
+            const cell = this.boardElement.querySelector(`[data-row="${cellInfo.row}"][data-col="${cellInfo.col}"]`);
+            if (cell && !this.revealed[cellInfo.row][cellInfo.col]) {
+                // タイムアウトセル用のスタイルクラスを追加
+                cell.classList.add('timeout-cell');
+                // 薄いオレンジ色の背景を設定
+                cell.style.backgroundColor = 'rgba(255, 165, 0, 0.3)';
+                cell.style.border = '2px solid #ff8c00';
+            }
+        });
+    }
+    
+    // タイムアウトハイライトをクリア
+    clearTimeoutHighlight() {
+        if (!this.boardElement) return;
+        this.boardElement.querySelectorAll('.timeout-cell').forEach(cell => {
+            cell.classList.remove('timeout-cell');
+            cell.style.backgroundColor = '';
+            cell.style.border = '';
+        });
     }
     
     showAssistPopup(probabilities) {
@@ -559,6 +594,10 @@ class PCProMinesweeper extends PCMinesweeper {
             // 永続確率と通常確率をマージして表示用の確率を作成
             const displayProbabilities = this.mergeWithPersistentProbabilities(result.probabilities);
             this.displayProbabilities(displayProbabilities, result.globalProbability);
+            // タイムアウトセルがあれば色付け
+            if (result.timedOutCells && result.timedOutCells.length > 0) {
+                this.highlightTimeoutCells(result.timedOutCells);
+            }
             this.hideCalculatingIndicator();
         }, 10);
     }
@@ -702,6 +741,9 @@ class PCProMinesweeper extends PCMinesweeper {
         
         // 全体確率表示をクリア
         this.hideGlobalProbabilityDisplay();
+        
+        // タイムアウトハイライトもクリア
+        this.clearTimeoutHighlight();
     }
     
     showCalculatingIndicator() {
