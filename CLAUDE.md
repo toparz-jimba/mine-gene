@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 主要クラス継承構造
 - `MinesweeperCore` - ベースゲームロジック（タイマー、ボード管理、地雷配置）
 - `PCMinesweeper` (MinesweeperCoreを継承) - PC向け基本機能（ズーム、マウス操作）
-- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能（CSPソルバー、統計、リプレイ、カスタムテーマ）
+- `PCProMinesweeper` (PCMinesweeperを継承) - 高度な機能（CSPソルバー、カスタムテーマ）
 
 ### 専門モジュール
 - `modules/csp-solver.js` - 制約充足問題ソルバー（地雷配置確率計算）
@@ -43,11 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### PRO版機能 (`game.js`)
 - **CSPソルバー**: 制約充足問題を用いた地雷配置確率計算 (`modules/csp-solver.js`)
-- **統計機能**: ゲーム記録、勝率、ベストタイム追跡
-- **リプレイ機能**: ゲーム履歴の記録・再生
-- **アンドゥ/リドゥ**: 操作の取り消し・やり直し
 - **カスタムテーマ**: 5種類の色テーマ（クラシック、オーシャン、フォレスト、サンセット、ギャラクシー）
-- **チャレンジモード**: 日次チャレンジとカスタムシード対応
 - **サウンドエフェクト**: ゲーム操作音の対応
 - **ズーム機能**: 0.3倍～3.0倍のスケーリング対応
 

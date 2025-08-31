@@ -27,7 +27,6 @@
                 <div class="timer-group">
                     <div class="displays-container">
                         <div class="assist-display-container"></div>
-                        <div class="global-stats-display-container"></div>
                     </div>
                     <div class="info-item">
                         <span class="emoji">⏱️</span>
@@ -55,21 +54,6 @@
             
             <!-- PRO版専用コントロール -->
             <div class="pro-controls">
-                <button id="stats-btn" class="control-btn pro-btn" title="統計">
-                    <span>📊</span>
-                </button>
-                <button id="undo-btn" class="control-btn pro-btn" title="元に戻す (Ctrl+Z)">
-                    <span>↩️</span>
-                </button>
-                <button id="redo-btn" class="control-btn pro-btn" title="やり直す (Ctrl+Y)">
-                    <span>↪️</span>
-                </button>
-                <button id="replay-btn" class="control-btn pro-btn" title="リプレイ">
-                    <span>▶ リプレイ</span>
-                </button>
-                <button id="challenge-btn" class="control-btn pro-btn" title="チャレンジモード">
-                    <span>🏆</span>
-                </button>
                 <button id="probability-btn" class="control-btn pro-btn" title="地雷確率表示">
                     <span>🎲 確率</span>
                 </button>
@@ -240,25 +224,12 @@
             <p id="clear-message" class="clear-message"></p>
             <div class="clear-modal-buttons">
                 <button id="next-difficulty-btn" class="clear-btn next-btn">次の難易度へ</button>
-                <button id="replay-difficulty-btn" class="clear-btn replay-btn">もう一度プレイ</button>
             </div>
         </div>
     </div>
     
     <!-- PRO版専用モーダル -->
-    <!-- 統計モーダル -->
-    <div id="stats-modal" class="modal">
-        <div class="modal-content stats-modal-content">
-            <div id="stats-content"></div>
-        </div>
-    </div>
     
-    <!-- チャレンジモーダル -->
-    <div id="challenge-modal" class="modal">
-        <div class="modal-content challenge-modal-content">
-            <div id="challenge-content"></div>
-        </div>
-    </div>
     
     <!-- スピードラン完了モーダル -->
     <div id="speedrun-complete-modal" class="modal">

@@ -962,8 +962,6 @@ class PCMinesweeper extends MinesweeperCore {
         }
         
         const nextBtn = document.getElementById('next-difficulty-btn');
-        const replayBtn = document.getElementById('replay-difficulty-btn');
-        
         // 次の難易度を決定
         const difficultyOrder = ['easy', 'medium', 'hard', 'hiddeneasy', 'hiddenmedium', 'hiddenhard', 'extreme'];
         const currentIndex = difficultyOrder.indexOf(this.currentDifficulty);
@@ -999,13 +997,6 @@ class PCMinesweeper extends MinesweeperCore {
             if (nextBtn) {
                 nextBtn.style.display = 'none';
             }
-        }
-        
-        if (replayBtn) {
-            replayBtn.onclick = () => {
-                modal.classList.remove('show');
-                this.newGame();
-            };
         }
         
         modal.classList.add('show');
