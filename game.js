@@ -18,9 +18,6 @@ class PCProMinesweeper extends PCMinesweeper {
         this.isReplaying = false;
         this.isRecording = true;
         
-        // ヒント機能
-        this.hintsUsed = 0;
-        this.maxHints = 3;
         
         // アンドゥ/リドゥ機能
         this.moveHistory = [];
@@ -72,11 +69,6 @@ class PCProMinesweeper extends PCMinesweeper {
             statsBtn.addEventListener('click', () => this.showStatistics());
         }
         
-        // ヒントボタン
-        const hintBtn = document.getElementById('hint-btn');
-        if (hintBtn) {
-            hintBtn.addEventListener('click', () => this.useHint());
-        }
         
         // アンドゥ/リドゥボタン
         const undoBtn = document.getElementById('undo-btn');
@@ -142,10 +134,6 @@ class PCProMinesweeper extends PCMinesweeper {
                     case 'y':
                         e.preventDefault();
                         this.redo();
-                        break;
-                    case 'h':
-                        e.preventDefault();
-                        this.useHint();
                         break;
                     case 's':
                         e.preventDefault();
@@ -266,53 +254,6 @@ class PCProMinesweeper extends PCMinesweeper {
         }
     }
     
-    // ヒント機能
-    useHint() {
-        if (this.gameOver || this.gameWon || this.hintsUsed >= this.maxHints) {
-            return;
-        }
-        
-        // 安全なセルを探す
-        const safeCells = this.findSafeCells();
-        if (safeCells.length > 0) {
-            const randomSafe = safeCells[Math.floor(Math.random() * safeCells.length)];
-            const cell = document.querySelector(`[data-row="${randomSafe.row}"][data-col="${randomSafe.col}"]`);
-            if (cell) {
-                cell.classList.add('hint-highlight');
-                setTimeout(() => {
-                    cell.classList.remove('hint-highlight');
-                }, 2000);
-            }
-            this.hintsUsed++;
-            this.updateHintButton();
-            if (this.soundEnabled) this.playSound('hint');
-        }
-    }
-    
-    findSafeCells() {
-        const safeCells = [];
-        
-        for (let row = 0; row < this.rows; row++) {
-            for (let col = 0; col < this.cols; col++) {
-                if (this.revealed[row][col] && this.board[row][col] > 0) {
-                    const neighbors = this.getNeighbors(row, col);
-                    const unrevealed = neighbors.filter(n => !this.revealed[n.row][n.col]);
-                    const flagged = neighbors.filter(n => this.flagged[n.row][n.col]);
-                    
-                    if (flagged.length === this.board[row][col]) {
-                        // すべての地雷が特定されている場合、残りは安全
-                        unrevealed.forEach(n => {
-                            if (!this.flagged[n.row][n.col]) {
-                                safeCells.push(n);
-                            }
-                        });
-                    }
-                }
-            }
-        }
-        
-        return safeCells;
-    }
     
     getNeighbors(row, col) {
         const neighbors = [];
@@ -329,15 +270,6 @@ class PCProMinesweeper extends PCMinesweeper {
         return neighbors;
     }
     
-    updateHintButton() {
-        const hintBtn = document.getElementById('hint-btn');
-        if (hintBtn) {
-            hintBtn.textContent = `💡 ヒント (${this.maxHints - this.hintsUsed})`;
-            if (this.hintsUsed >= this.maxHints) {
-                hintBtn.disabled = true;
-            }
-        }
-    }
     
     // アンドゥ/リドゥ機能
     saveMove(move) {
@@ -627,10 +559,6 @@ class PCProMinesweeper extends PCMinesweeper {
                 oscillator.frequency.value = 200;
                 gainNode.gain.value = 0.2;
                 break;
-            case 'hint':
-                oscillator.frequency.value = 700;
-                gainNode.gain.value = 0.15;
-                break;
             case 'undo':
                 oscillator.frequency.value = 500;
                 gainNode.gain.value = 0.1;
@@ -837,10 +765,8 @@ class PCProMinesweeper extends PCMinesweeper {
         const assistModeState = this.assistMode;
         
         // リセット
-        this.hintsUsed = 0;
         this.moveHistory = [];
         this.redoHistory = [];
-        this.updateHintButton();
         this.updateUndoRedoButtons();
         
         // 確率表示をクリア

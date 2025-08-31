@@ -958,16 +958,6 @@ body.power-save-mode .control-btn.active {
     cursor: not-allowed;
 }
 
-/* ヒントハイライト */
-.hint-highlight {
-    animation: hint-pulse 2s ease-in-out;
-    box-shadow: 0 0 20px var(--pro-accent), 0 0 40px var(--pro-accent);
-}
-
-@keyframes hint-pulse {
-    0%, 100% { box-shadow: 0 0 5px var(--pro-accent); }
-    50% { box-shadow: 0 0 20px var(--pro-accent), 0 0 40px var(--pro-accent); }
-}
 
 /* PRO版モーダル共通スタイル */
 .modal {
