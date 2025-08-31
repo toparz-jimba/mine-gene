@@ -7,7 +7,7 @@ class CSPSolver {
         this.probabilities = [];
         this.persistentProbabilities = []; // 0%と100%の確率を永続的に保持
         this.maxConstraintSize = 25; // 完全探索の最大サイズ
-        this.maxLocalCompletenessSize = 32; // 局所制約完全性処理の最大サイズ
+        this.maxLocalCompletenessSize = 200; // 局所制約完全性処理の最大サイズ（大幅緩和）
         this.warningThreshold = 30; // 警告を表示するセル数の閾値
         this.maxValidConfigs = 500000; // 有効な配置の最大数を増加
         this.useWebWorker = typeof Worker !== 'undefined' && window.location.protocol !== 'file:';
@@ -116,7 +116,7 @@ class CSPSolver {
                 }
             }
         } else {
-            // フェーズ1: 全グループに制約伝播のみ適用
+            // フェーズ1: 全グループに制約伝播のみ適用（確定マスが見つかったら即座に中断）
             let foundActionableCell = false;
             
             for (let i = 0; i < constraintGroups.length; i++) {
@@ -125,6 +125,7 @@ class CSPSolver {
                 const hasActionable = this.applyConstraintPropagationOnly(group);
                 if (hasActionable) {
                     foundActionableCell = true;
+                    break; // 確定マスが見つかったら即座に中断
                 }
             }
             
@@ -608,7 +609,7 @@ class CSPSolver {
         const subsetCells = subset.cells.map(idx => group[idx]);
         
         // サイズチェック（安全性のため）
-        if (subsetCells.length > this.maxConstraintSize) {
+        if (subsetCells.length > this.maxLocalCompletenessSize) {
             console.warn(`Independent subset too large (${subsetCells.length} cells). Skipping.`);
             return false;
         }
@@ -910,7 +911,7 @@ class CSPSolver {
         }
         
         // セル数チェック（単一制約でも大きすぎる場合は通常の処理に委ねる）
-        if (cellCount > this.maxConstraintSize) {
+        if (cellCount > this.maxLocalCompletenessSize) {
             return null;
         }
         
@@ -1092,7 +1093,7 @@ class CSPSolver {
             determinedCells = this.determineCertainCells(group, constraints);
             
             // デバッグ情報（大きなグループの場合のみ）
-            if (group.length > this.maxConstraintSize) {
+            if (group.length > this.maxLocalCompletenessSize) {
                 console.log(`Constraint propagation: ${determinedCells.certain.length} mines, ${determinedCells.safe.length} safe cells confirmed`);
             }
             
@@ -1125,7 +1126,7 @@ class CSPSolver {
                     
                     // 小さな独立部分集合があれば優先的に処理
                     for (const subset of independentSubsets) {
-                        if (subset.cells.length <= this.maxConstraintSize) {
+                        if (subset.cells.length <= this.maxLocalCompletenessSize) {
                             const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
                             if (hasActionableFromSubset) {
                                 console.log(`[LOCAL COMPLETENESS] Found actionable cells in independent subset of ${subset.cells.length} cells`);
@@ -1140,7 +1141,7 @@ class CSPSolver {
                                 console.log(`[LOCAL COMPLETENESS] No actionable cells found in subset of ${subset.cells.length} cells`);
                             }
                         } else {
-                            console.log(`[LOCAL COMPLETENESS] Skipping large subset of ${subset.cells.length} cells (exceeds limit of ${this.maxConstraintSize})`);
+                            console.log(`[LOCAL COMPLETENESS] Skipping large subset of ${subset.cells.length} cells (exceeds limit of ${this.maxLocalCompletenessSize})`);
                         }
                     }
                     console.log(`[LOCAL COMPLETENESS] All independent subsets processed. No actionable cells found.`);
@@ -1188,8 +1189,8 @@ class CSPSolver {
         );
         
         // グループが大きすぎる場合は完全探索をスキップ
-        if (uncertainIndices.length > this.maxConstraintSize) {
-            console.warn(`Uncertain group too large (${uncertainIndices.length} cells > ${this.maxConstraintSize}). Skipping full search.`);
+        if (uncertainIndices.length > this.maxLocalCompletenessSize) {
+            console.warn(`Uncertain group too large (${uncertainIndices.length} cells > ${this.maxLocalCompletenessSize}). Skipping full search.`);
             
             // 局所制約完全性処理を試行（グループサイズが制限内の場合）
             let hasActionableFromLocal = false;
@@ -1201,7 +1202,7 @@ class CSPSolver {
                     console.log(`[LOCAL COMPLETENESS] Found ${independentSubsets.length} independent subset(s): ${independentSubsets.map(s => s.cells.length + ' cells').join(', ')}`);
                     
                     for (const subset of independentSubsets) {
-                        if (subset.cells.length <= this.maxConstraintSize) {
+                        if (subset.cells.length <= this.maxLocalCompletenessSize) {
                             const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
                             if (hasActionableFromSubset) {
                                 console.log(`[LOCAL COMPLETENESS] Found actionable cells in independent subset of ${subset.cells.length} cells`);
