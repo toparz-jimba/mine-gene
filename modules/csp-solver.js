@@ -268,7 +268,8 @@ class CSPSolver {
         }
         
         // 地雷候補マスをマーク（確定安全マスに依存する場合）
-        this.markMineCandidatesForConfirmedSafes(borderCells);
+        // 注意: 既にフェーズ2で実行済みの場合は重複を避ける
+        // this.markMineCandidatesForConfirmedSafes(borderCells); // 重複処理のため一時コメントアウト
         
         return { probabilities: this.probabilities, globalProbability };
     }
@@ -1194,8 +1195,13 @@ class CSPSolver {
                 if (independentSubsets.length > 0) {
                     console.log(`[LOCAL COMPLETENESS] Found ${independentSubsets.length} independent subset(s): ${independentSubsets.map(s => s.cells.length + ' cells').join(', ')}`);
                     
-                    // 小さな独立部分集合があれば優先的に処理
-                    for (const subset of independentSubsets) {
+                    // グループ全体が1つの部分集合の場合は独立性なし（早期判定）
+                    if (independentSubsets.length === 1 && independentSubsets[0].cells.length === group.length) {
+                        console.log(`[LOCAL COMPLETENESS] No true independence found - entire group is interconnected (${group.length} cells)`);
+                        console.log(`[LOCAL COMPLETENESS] Skipping local completeness processing for non-independent group`);
+                    } else {
+                        // 小さな独立部分集合があれば優先的に処理
+                        for (const subset of independentSubsets) {
                         if (subset.cells.length <= this.maxLocalCompletenessSize) {
                             const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
                             if (hasActionableFromSubset) {
@@ -1213,8 +1219,9 @@ class CSPSolver {
                         } else {
                             console.log(`[LOCAL COMPLETENESS] Skipping large subset of ${subset.cells.length} cells (exceeds limit of ${this.maxLocalCompletenessSize})`);
                         }
+                        }
+                        console.log(`[LOCAL COMPLETENESS] All independent subsets processed. No actionable cells found.`);
                     }
-                    console.log(`[LOCAL COMPLETENESS] All independent subsets processed. No actionable cells found.`);
                 } else {
                     console.log(`[LOCAL COMPLETENESS] No independent subsets found in group of ${group.length} cells`);
                 }
@@ -1271,7 +1278,12 @@ class CSPSolver {
                 if (independentSubsets.length > 0) {
                     console.log(`[LOCAL COMPLETENESS] Found ${independentSubsets.length} independent subset(s): ${independentSubsets.map(s => s.cells.length + ' cells').join(', ')}`);
                     
-                    for (const subset of independentSubsets) {
+                    // グループ全体が1つの部分集合の場合は独立性なし（早期判定）
+                    if (independentSubsets.length === 1 && independentSubsets[0].cells.length === group.length) {
+                        console.log(`[LOCAL COMPLETENESS] No true independence found - entire group is interconnected (${group.length} cells)`);
+                        console.log(`[LOCAL COMPLETENESS] Skipping local completeness processing for non-independent group`);
+                    } else {
+                        for (const subset of independentSubsets) {
                         if (subset.cells.length <= this.maxLocalCompletenessSize) {
                             const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
                             if (hasActionableFromSubset) {
@@ -1279,6 +1291,7 @@ class CSPSolver {
                                 hasActionableFromLocal = true;
                                 break; // 1つでも確定マスが見つかれば成功
                             }
+                        }
                         }
                     }
                 }
@@ -1420,13 +1433,27 @@ class CSPSolver {
         const totalConfigs = Math.pow(2, uncertainGroup.length);
         
         // パフォーマンス測定用カウンター更新
-        // 注意: totalCellsProcessedは局所制約完全性で既にカウント済みの可能性があるため、重複を避ける
         this.totalConfigurations += totalConfigs;
         this.totalExhaustiveSearches += 1;
-        // this.totalCellsProcessed += uncertainGroup.length; // 重複カウント回避のためコメントアウト
+        this.totalCellsProcessed += uncertainGroup.length;
         
-        // すべての可能な配置を試す
+        // タイムアウト設定（10秒）
+        const startTime = performance.now();
+        const timeoutMs = 10000; // 10秒
+        let timedOut = false;
+        
+        // すべての可能な配置を試す（タイムアウト付き）
         for (let config = 0; config < totalConfigs; config++) {
+            // タイムアウトチェック（1000パターンごと）
+            if (config % 1000 === 0) {
+                const elapsedTime = performance.now() - startTime;
+                if (elapsedTime > timeoutMs) {
+                    timedOut = true;
+                    console.log(`[TIMEOUT] Full search stopped after ${elapsedTime.toFixed(0)}ms (${validConfigurations.length} valid patterns found, ${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
+                    this.totalConfigurations = config + 1; // 実際に処理したパターン数に更新
+                    break;
+                }
+            }
             
             const mines = [];
             for (let i = 0; i < uncertainGroup.length; i++) {
@@ -1440,9 +1467,12 @@ class CSPSolver {
             }
         }
         
-        // 有効な配置から確率を計算
+        // 有効な配置から確率を計算（タイムアウト時は部分計算）
         let hasActionableCell = false;
         if (validConfigurations.length > 0) {
+            if (timedOut) {
+                console.log(`[TIMEOUT] Using partial results from ${validConfigurations.length} valid configurations`);
+            }
             for (let i = 0; i < uncertainGroup.length; i++) {
                 let mineCount = 0;
                 for (const config of validConfigurations) {
@@ -1463,7 +1493,10 @@ class CSPSolver {
                 }
             }
         } else {
-            // デフォルト値
+            // デフォルト値（エラー状態またはタイムアウト）
+            if (timedOut) {
+                console.warn('Timed out before finding any valid configurations. Using default probabilities.');
+            }
             for (let i = 0; i < uncertainGroup.length; i++) {
                 const originalIdx = originalIndices[i];
                 this.probabilities[fullGroup[originalIdx].row][fullGroup[originalIdx].col] = 50;
