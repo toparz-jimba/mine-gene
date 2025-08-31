@@ -630,8 +630,23 @@ class CSPSolver {
         let foundActionable = false;
         let validConfigCount = 0;
         
-        // すべての可能な配置を試す（早期確定判定付き）
+        // タイムアウト設定（10秒）
+        const startTime = performance.now();
+        const timeoutMs = 10000; // 10秒
+        let timedOut = false;
+        
+        // すべての可能な配置を試す（早期確定判定付き＋タイムアウト）
         for (let config = 0; config < totalConfigs; config++) {
+            // タイムアウトチェック（1000パターンごと）
+            if (config % 1000 === 0) {
+                const elapsedTime = performance.now() - startTime;
+                if (elapsedTime > timeoutMs) {
+                    timedOut = true;
+                    console.log(`[TIMEOUT] Processing stopped after ${elapsedTime.toFixed(0)}ms (${validConfigCount} valid patterns found, ${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
+                    this.totalConfigurations = config + 1; // 実際に処理したパターン数に更新
+                    break;
+                }
+            }
             const mines = [];
             for (let i = 0; i < subsetCells.length; i++) {
                 if ((config >> i) & 1) {
@@ -671,6 +686,7 @@ class CSPSolver {
                     
                     if (hasNewActionable && !foundActionable) {
                         foundActionable = true;
+                        hasActionableCell = true; // 戻り値に反映
                         console.log(`[EARLY TERMINATION] Found actionable cells after ${validConfigCount} valid patterns (${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
                     }
                     
@@ -685,9 +701,13 @@ class CSPSolver {
             }
         }
         
-        // 有効な配置から確率を計算
+        // 有効な配置から確率を計算（タイムアウト時は部分計算）
         let hasActionableCell = false;
         if (validConfigurations.length > 0) {
+            if (timedOut) {
+                console.log(`[TIMEOUT] Using partial results from ${validConfigurations.length} valid configurations`);
+            }
+            
             for (let i = 0; i < subsetCells.length; i++) {
                 let mineCount = 0;
                 for (const config of validConfigurations) {
@@ -706,8 +726,12 @@ class CSPSolver {
                 }
             }
         } else {
-            // 有効な配置がない場合（エラー状態）
-            console.warn('No valid configurations found for independent subset');
+            // 有効な配置がない場合（エラー状態またはタイムアウト）
+            if (timedOut) {
+                console.warn('Timed out before finding any valid configurations. Using default probabilities.');
+            } else {
+                console.warn('No valid configurations found for independent subset');
+            }
             for (const cell of subsetCells) {
                 this.probabilities[cell.row][cell.col] = 50; // デフォルト値
             }
@@ -1396,9 +1420,10 @@ class CSPSolver {
         const totalConfigs = Math.pow(2, uncertainGroup.length);
         
         // パフォーマンス測定用カウンター更新
+        // 注意: totalCellsProcessedは局所制約完全性で既にカウント済みの可能性があるため、重複を避ける
         this.totalConfigurations += totalConfigs;
         this.totalExhaustiveSearches += 1;
-        this.totalCellsProcessed += uncertainGroup.length;
+        // this.totalCellsProcessed += uncertainGroup.length; // 重複カウント回避のためコメントアウト
         
         // すべての可能な配置を試す
         for (let config = 0; config < totalConfigs; config++) {
