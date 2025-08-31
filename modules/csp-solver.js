@@ -1403,10 +1403,310 @@ class CSPSolver {
             }
         }
         
+        // 1セル制約伝播で確定セルが見つかった場合は即座に返す
+        if (certain.size > 0 || safe.size > 0) {
+            return {
+                certain: Array.from(certain),
+                safe: Array.from(safe)
+            };
+        }
+        
+        // 1セル制約伝播で確定しなかった場合のみ2セル制約伝播を試行
+        const twoCellResult = this.determineTwoCellCertainCells(group, constraints);
+        return {
+            certain: twoCellResult.certain,
+            safe: twoCellResult.safe
+        };
+    }
+    
+    // 2セル制約伝播で確定できるセルを見つける
+    determineTwoCellCertainCells(group, constraints) {
+        const certain = new Set(); // 100%地雷
+        const safe = new Set();    // 0%安全
+        
+        console.log(`[2-CELL PROPAGATION] Analyzing ${group.length} cells with ${constraints.length} constraints`);
+        
+        // 全セルペアについて推論を試行
+        for (let i = 0; i < group.length; i++) {
+            for (let j = i + 1; j < group.length; j++) {
+                const cellA = i;
+                const cellB = j;
+                
+                // このペアが関与する制約を収集
+                const relevantConstraints = [];
+                for (const constraint of constraints) {
+                    const involvedCells = constraint.cells.filter(idx => idx === cellA || idx === cellB);
+                    if (involvedCells.length > 0) {
+                        relevantConstraints.push(constraint);
+                    }
+                }
+                
+                if (relevantConstraints.length === 0) continue;
+                
+                // ペアの4つの可能性を検証
+                const possibilities = [
+                    [0, 0], // A安全、B安全
+                    [0, 1], // A安全、B地雷  
+                    [1, 0], // A地雷、B安全
+                    [1, 1]  // A地雷、B地雷
+                ];
+                
+                const validPossibilities = [];
+                
+                for (const [mineA, mineB] of possibilities) {
+                    // このペア配置でグループ全体が制約を満たせるかをより厳密にチェック
+                    const isValid = this.isValidPairAssignment(group, constraints, cellA, cellB, mineA, mineB);
+                    
+                    if (isValid) {
+                        validPossibilities.push([mineA, mineB]);
+                    }
+                }
+                
+                // 確定セルが見つかる可能性がある場合のみログ出力
+                if (validPossibilities.length > 0 && validPossibilities.length < 4) {
+                    console.log(`[2-CELL DEBUG] Pair (${cellA}, ${cellB}) has ${validPossibilities.length}/4 valid possibilities: ${JSON.stringify(validPossibilities)}`);
+                }
+                
+                // 有効な可能性が0の場合はスキップ
+                if (validPossibilities.length === 0) continue;
+                
+                // セルAの確定状態をチェック
+                const aMines = validPossibilities.map(p => p[0]);
+                const aAllMines = aMines.every(m => m === 1);
+                const aAllSafe = aMines.every(m => m === 0);
+                
+                if (aAllMines && !certain.has(cellA)) {
+                    certain.add(cellA);
+                    console.log(`[2-CELL PROPAGATION] Cell ${cellA} determined as MINE from pair (${cellA},${cellB})`);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                } else if (aAllSafe && !safe.has(cellA)) {
+                    safe.add(cellA);
+                    console.log(`[2-CELL PROPAGATION] Cell ${cellA} determined as SAFE from pair (${cellA},${cellB})`);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                }
+                
+                // セルBの確定状態をチェック
+                const bMines = validPossibilities.map(p => p[1]);
+                const bAllMines = bMines.every(m => m === 1);
+                const bAllSafe = bMines.every(m => m === 0);
+                
+                if (bAllMines && !certain.has(cellB)) {
+                    certain.add(cellB);
+                    console.log(`[2-CELL PROPAGATION] Cell ${cellB} determined as MINE from pair (${cellA},${cellB})`);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                } else if (bAllSafe && !safe.has(cellB)) {
+                    safe.add(cellB);
+                    console.log(`[2-CELL PROPAGATION] Cell ${cellB} determined as SAFE from pair (${cellA},${cellB})`);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                }
+                
+                // 高度な推論: [[0,1],[1,0]]のような「排他的OR」パターンでの推論
+                if (validPossibilities.length === 2 && 
+                    JSON.stringify(validPossibilities.sort()) === JSON.stringify([[0,1],[1,0]])) {
+                    // このペアは必ずどちらか一方が地雷
+                    const indirectResult = this.inferFromExclusiveOrPair(group, constraints, cellA, cellB);
+                    if (indirectResult.foundNew) {
+                        console.log(`[2-CELL PROPAGATION] Indirect inference from exclusive-OR pair (${cellA},${cellB})`);
+                        return indirectResult;
+                    }
+                }
+            }
+        }
+        
+        console.log(`[2-CELL PROPAGATION] No cells determined`);
         return {
             certain: Array.from(certain),
-            safe: Array.from(safe)
+            safe: Array.from(safe),
+            foundNew: false
         };
+    }
+    
+    // ペア配置が制約を満たせるかを厳密にチェック
+    isValidPairAssignment(group, constraints, cellA, cellB, mineA, mineB) {
+        // 各制約について、このペア配置で制約を満たせるかチェック
+        for (const constraint of constraints) {
+            let minesFromPair = 0;
+            let pairCellsInConstraint = 0;
+            
+            // ペアが制約に含まれるかチェック
+            if (constraint.cells.includes(cellA)) {
+                minesFromPair += mineA;
+                pairCellsInConstraint++;
+            }
+            if (constraint.cells.includes(cellB)) {
+                minesFromPair += mineB;
+                pairCellsInConstraint++;
+            }
+            
+            // ペアが制約に関与しない場合はスキップ
+            if (pairCellsInConstraint === 0) continue;
+            
+            // 制約内の他のセル（ペア以外）
+            const otherCells = constraint.cells.filter(idx => idx !== cellA && idx !== cellB);
+            const requiredFromOthers = constraint.requiredMines - minesFromPair;
+            
+            // 基本的な制約違反チェック
+            if (requiredFromOthers < 0 || requiredFromOthers > otherCells.length) {
+                return false;
+            }
+            
+            // より厳密なチェック：他のセルに対する制約も考慮
+            if (otherCells.length > 0) {
+                // 他のセルについて、他の制約との整合性をチェック
+                let minPossibleMines = 0;
+                let maxPossibleMines = otherCells.length;
+                
+                // 他の制約を考慮して、otherCellsに配置可能な地雷数の範囲を計算
+                for (const otherConstraint of constraints) {
+                    if (otherConstraint === constraint) continue;
+                    
+                    // この制約がotherCellsのどれかを含むかチェック
+                    const overlapCells = otherConstraint.cells.filter(idx => 
+                        otherCells.includes(idx));
+                    
+                    if (overlapCells.length > 0) {
+                        // overlapしているセルについて、ペア配置を考慮した制約を計算
+                        let minesFromPairInOtherConstraint = 0;
+                        if (otherConstraint.cells.includes(cellA)) minesFromPairInOtherConstraint += mineA;
+                        if (otherConstraint.cells.includes(cellB)) minesFromPairInOtherConstraint += mineB;
+                        
+                        const nonOverlapCells = otherConstraint.cells.filter(idx => 
+                            !overlapCells.includes(idx) && idx !== cellA && idx !== cellB);
+                        
+                        const requiredFromOverlapAndNonOverlap = otherConstraint.requiredMines - minesFromPairInOtherConstraint;
+                        
+                        // overlapCellsに必要な地雷数の制約
+                        const minFromOverlap = Math.max(0, requiredFromOverlapAndNonOverlap - nonOverlapCells.length);
+                        const maxFromOverlap = Math.min(overlapCells.length, requiredFromOverlapAndNonOverlap);
+                        
+                        if (minFromOverlap < 0 || maxFromOverlap > overlapCells.length || minFromOverlap > maxFromOverlap) {
+                            return false;
+                        }
+                    }
+                }
+                
+                // requiredFromOthersが実現可能な範囲内かチェック
+                if (requiredFromOthers < minPossibleMines || requiredFromOthers > maxPossibleMines) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // 排他的ORペア（必ずどちらか一方が地雷）からの間接推論
+    inferFromExclusiveOrPair(group, constraints, cellA, cellB) {
+        const certain = new Set();
+        const safe = new Set();
+        
+        // 他のセルとの関係から推論を試行
+        for (let k = 0; k < group.length; k++) {
+            if (k === cellA || k === cellB) continue;
+            
+            // セルkがcellA, cellBと関係する制約を探す
+            const relevantConstraints = [];
+            for (const constraint of constraints) {
+                const involvedCells = [cellA, cellB, k].filter(idx => constraint.cells.includes(idx));
+                if (involvedCells.length >= 2) {
+                    relevantConstraints.push({
+                        constraint: constraint,
+                        involvedCount: involvedCells.length
+                    });
+                }
+            }
+            
+            if (relevantConstraints.length === 0) continue;
+            
+            // セルkの2つの可能性（地雷/安全）について検証
+            for (const mineK of [0, 1]) {
+                let validConfigurations = 0;
+                
+                // cellA=1, cellB=0, cellK=mineKの場合
+                if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 1, 0, mineK)) {
+                    validConfigurations++;
+                }
+                
+                // cellA=0, cellB=1, cellK=mineKの場合  
+                if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 0, 1, mineK)) {
+                    validConfigurations++;
+                }
+                
+                // mineK=0で有効な配置が0個 → セルkは必ず地雷
+                if (mineK === 0 && validConfigurations === 0) {
+                    certain.add(k);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                }
+                
+                // mineK=1で有効な配置が0個 → セルkは必ず安全
+                if (mineK === 1 && validConfigurations === 0) {
+                    safe.add(k);
+                    return {
+                        certain: Array.from(certain),
+                        safe: Array.from(safe),
+                        foundNew: true
+                    };
+                }
+            }
+        }
+        
+        return {
+            certain: Array.from(certain),
+            safe: Array.from(safe),
+            foundNew: false
+        };
+    }
+    
+    // 3セルの組み合わせが制約を満たすかチェック
+    isValidTripleAssignment(group, constraints, cellA, cellB, cellC, mineA, mineB, mineC) {
+        for (const constraint of constraints) {
+            let minesFromTriple = 0;
+            let tripleCellsInConstraint = 0;
+            
+            if (constraint.cells.includes(cellA)) {
+                minesFromTriple += mineA;
+                tripleCellsInConstraint++;
+            }
+            if (constraint.cells.includes(cellB)) {
+                minesFromTriple += mineB;
+                tripleCellsInConstraint++;
+            }
+            if (constraint.cells.includes(cellC)) {
+                minesFromTriple += mineC;
+                tripleCellsInConstraint++;
+            }
+            
+            if (tripleCellsInConstraint === 0) continue;
+            
+            const otherCells = constraint.cells.filter(idx => idx !== cellA && idx !== cellB && idx !== cellC);
+            const requiredFromOthers = constraint.requiredMines - minesFromTriple;
+            
+            if (requiredFromOthers < 0 || requiredFromOthers > otherCells.length) {
+                return false;
+            }
+        }
+        
+        return true;
     }
     
     // 不確定セル用に制約を調整
