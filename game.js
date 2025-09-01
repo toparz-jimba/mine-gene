@@ -349,12 +349,26 @@ class PCProMinesweeper extends PCMinesweeper {
                     // アシストクラスをクリア
                     cell.classList.remove('probability-safe', 'probability-low', 
                                         'probability-medium', 'probability-high', 'probability-certain',
-                                        'probability-unknown', 'probability-interrupted',
+                                        'probability-unknown', 'probability-interrupted', 'probability-twocell-ref',
                                         'mine-candidate');
 
                     const probability = probabilities[row][col];
 
-                    if (probability === -5) {
+                    if (probability === -3) {
+                        // 計算中断のセル
+                        cell.classList.add('probability-interrupted');
+                        const overlay = document.createElement('div');
+                        overlay.className = 'probability-overlay';
+                        overlay.textContent = '---';
+                        cell.appendChild(overlay);
+                    } else if (probability === -4) {
+                        // 2セル制約伝播参考のセル
+                        cell.classList.add('probability-twocell-ref');
+                        const overlay = document.createElement('div');
+                        overlay.className = 'probability-overlay';
+                        overlay.textContent = '2C';
+                        cell.appendChild(overlay);
+                    } else if (probability === -5) {
                         // 地雷候補マス：アルファベットIDがある場合のみ表示
                         const alphabetIds = this.cspSolver ? this.cspSolver.getAlphabetIdsForCell(row, col) : null;
                         if (alphabetIds) {
@@ -440,7 +454,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 }
                 cell.classList.remove('probability-safe', 'probability-low', 
                                     'probability-medium', 'probability-high', 'probability-certain',
-                                    'probability-unknown', 'probability-interrupted', 'probability-skipped',
+                                    'probability-unknown', 'probability-interrupted', 'probability-twocell-ref', 'probability-skipped',
                                     'mine-candidate');
             });
         }
@@ -620,7 +634,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 // 確率クラスをクリア
                 cell.classList.remove('probability-safe', 'probability-low', 
                                     'probability-medium', 'probability-high', 'probability-certain',
-                                    'probability-unknown', 'probability-interrupted', 'probability-skipped',
+                                    'probability-unknown', 'probability-interrupted', 'probability-twocell-ref', 'probability-skipped',
                                     'mine-candidate');
                 
                 const probability = probabilities[row][col];
@@ -666,11 +680,11 @@ class PCProMinesweeper extends PCMinesweeper {
                     overlay.textContent = '---';
                     cell.appendChild(overlay);
                 } else if (probability === -4) {
-                    // 完全探索スキップのセル
-                    cell.classList.add('probability-skipped');
+                    // 2セル制約伝播参考のセル
+                    cell.classList.add('probability-twocell-ref');
                     const overlay = document.createElement('div');
                     overlay.className = 'probability-overlay';
-                    overlay.textContent = '----';
+                    overlay.textContent = '2C';
                     cell.appendChild(overlay);
                 } else if (probability === 0) {
                     // 確定安全マス（0%）
@@ -734,7 +748,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 }
                 cell.classList.remove('probability-safe', 'probability-low', 
                                     'probability-medium', 'probability-high', 'probability-certain',
-                                    'probability-unknown', 'probability-interrupted', 'probability-skipped',
+                                    'probability-unknown', 'probability-interrupted', 'probability-twocell-ref', 'probability-skipped',
                                     'mine-candidate');
             }
         });

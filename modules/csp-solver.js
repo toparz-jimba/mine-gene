@@ -795,6 +795,33 @@ class CSPSolver {
         console.log(`[LOCAL COMPLETENESS] Marked ${interruptedCount} cells as calculation interrupted (-3)`);
     }
     
+    // 2セル制約伝播で参考になったセルをマーク
+    markTwoCellReferenceCells(group, cellA, cellB) {
+        let referenceCount = 0;
+        
+        const cellAInfo = group[cellA];
+        const cellBInfo = group[cellB];
+        
+        // 推論に関与した重要なセルのみマーク：
+        // 1. 確定セルの根拠となったペアセル（確定しなかった方）
+        // 2. そのペアと制約を共有するセル
+        
+        // 確定しなかった方のペアセルをマーク
+        const cellAProb = this.probabilities[cellAInfo.row][cellAInfo.col];
+        const cellBProb = this.probabilities[cellBInfo.row][cellBInfo.col];
+        
+        if (cellAProb !== 0 && cellAProb !== 100) {
+            this.probabilities[cellAInfo.row][cellAInfo.col] = -4;
+            referenceCount++;
+        }
+        
+        if (cellBProb !== 0 && cellBProb !== 100) {
+            this.probabilities[cellBInfo.row][cellBInfo.col] = -4;
+            referenceCount++;
+        }
+        
+    }
+    
     // 確定安全マス（0%）の依存地雷候補をマーク
     markMineCandidatesForConfirmedSafes(group) {
         const confirmedSafeCells = [];
@@ -1343,12 +1370,18 @@ class CSPSolver {
             if (constraint.requiredMines === constraint.cells.length) {
                 // すべてのセルが地雷
                 for (const cellIdx of constraint.cells) {
-                    certain.add(cellIdx);
+                    if (!certain.has(cellIdx)) {
+                        certain.add(cellIdx);
+                        changed = true;
+                    }
                 }
             } else if (constraint.requiredMines === 0) {
                 // すべてのセルが安全
                 for (const cellIdx of constraint.cells) {
-                    safe.add(cellIdx);
+                    if (!safe.has(cellIdx)) {
+                        safe.add(cellIdx);
+                        changed = true;
+                    }
                 }
             }
         }
@@ -1424,8 +1457,6 @@ class CSPSolver {
         const certain = new Set(); // 100%地雷
         const safe = new Set();    // 0%安全
         
-        console.log(`[2-CELL PROPAGATION] Analyzing ${group.length} cells with ${constraints.length} constraints`);
-        
         // 全セルペアについて推論を試行
         for (let i = 0; i < group.length; i++) {
             for (let j = i + 1; j < group.length; j++) {
@@ -1462,11 +1493,6 @@ class CSPSolver {
                     }
                 }
                 
-                // 確定セルが見つかる可能性がある場合のみログ出力
-                if (validPossibilities.length > 0 && validPossibilities.length < 4) {
-                    console.log(`[2-CELL DEBUG] Pair (${cellA}, ${cellB}) has ${validPossibilities.length}/4 valid possibilities: ${JSON.stringify(validPossibilities)}`);
-                }
-                
                 // 有効な可能性が0の場合はスキップ
                 if (validPossibilities.length === 0) continue;
                 
@@ -1477,7 +1503,8 @@ class CSPSolver {
                 
                 if (aAllMines && !certain.has(cellA)) {
                     certain.add(cellA);
-                    console.log(`[2-CELL PROPAGATION] Cell ${cellA} determined as MINE from pair (${cellA},${cellB})`);
+                    // 参考になったペアセルを2セル制約伝播参考としてマーク
+                    this.markTwoCellReferenceCells(group, cellA, cellB);
                     return {
                         certain: Array.from(certain),
                         safe: Array.from(safe),
@@ -1485,7 +1512,8 @@ class CSPSolver {
                     };
                 } else if (aAllSafe && !safe.has(cellA)) {
                     safe.add(cellA);
-                    console.log(`[2-CELL PROPAGATION] Cell ${cellA} determined as SAFE from pair (${cellA},${cellB})`);
+                    // 参考になったペアセルを2セル制約伝播参考としてマーク
+                    this.markTwoCellReferenceCells(group, cellA, cellB);
                     return {
                         certain: Array.from(certain),
                         safe: Array.from(safe),
@@ -1500,7 +1528,8 @@ class CSPSolver {
                 
                 if (bAllMines && !certain.has(cellB)) {
                     certain.add(cellB);
-                    console.log(`[2-CELL PROPAGATION] Cell ${cellB} determined as MINE from pair (${cellA},${cellB})`);
+                    // 参考になったペアセルを2セル制約伝播参考としてマーク
+                    this.markTwoCellReferenceCells(group, cellA, cellB);
                     return {
                         certain: Array.from(certain),
                         safe: Array.from(safe),
@@ -1508,7 +1537,8 @@ class CSPSolver {
                     };
                 } else if (bAllSafe && !safe.has(cellB)) {
                     safe.add(cellB);
-                    console.log(`[2-CELL PROPAGATION] Cell ${cellB} determined as SAFE from pair (${cellA},${cellB})`);
+                    // 参考になったペアセルを2セル制約伝播参考としてマーク
+                    this.markTwoCellReferenceCells(group, cellA, cellB);
                     return {
                         certain: Array.from(certain),
                         safe: Array.from(safe),
@@ -1522,14 +1552,14 @@ class CSPSolver {
                     // このペアは必ずどちらか一方が地雷
                     const indirectResult = this.inferFromExclusiveOrPair(group, constraints, cellA, cellB);
                     if (indirectResult.foundNew) {
-                        console.log(`[2-CELL PROPAGATION] Indirect inference from exclusive-OR pair (${cellA},${cellB})`);
+                        // 参考になったペアセルを2セル制約伝播参考としてマーク
+                        this.markTwoCellReferenceCells(group, cellA, cellB);
                         return indirectResult;
                     }
                 }
             }
         }
         
-        console.log(`[2-CELL PROPAGATION] No cells determined`);
         return {
             certain: Array.from(certain),
             safe: Array.from(safe),
@@ -1616,60 +1646,53 @@ class CSPSolver {
         const certain = new Set();
         const safe = new Set();
         
-        // 他のセルとの関係から推論を試行
+        // 他のセルについて、排他的ORペアの制約を考慮して推論
         for (let k = 0; k < group.length; k++) {
             if (k === cellA || k === cellB) continue;
             
-            // セルkがcellA, cellBと関係する制約を探す
-            const relevantConstraints = [];
-            for (const constraint of constraints) {
-                const involvedCells = [cellA, cellB, k].filter(idx => constraint.cells.includes(idx));
-                if (involvedCells.length >= 2) {
-                    relevantConstraints.push({
-                        constraint: constraint,
-                        involvedCount: involvedCells.length
-                    });
-                }
+            // セルkが確定できるかテスト
+            let canBeZero = false;
+            let canBeOne = false;
+            
+            // ケース1: cellA=1, cellB=0, cellK=0
+            if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 1, 0, 0)) {
+                canBeZero = true;
             }
             
-            if (relevantConstraints.length === 0) continue;
+            // ケース2: cellA=0, cellB=1, cellK=0  
+            if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 0, 1, 0)) {
+                canBeZero = true;
+            }
             
-            // セルkの2つの可能性（地雷/安全）について検証
-            for (const mineK of [0, 1]) {
-                let validConfigurations = 0;
-                
-                // cellA=1, cellB=0, cellK=mineKの場合
-                if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 1, 0, mineK)) {
-                    validConfigurations++;
-                }
-                
-                // cellA=0, cellB=1, cellK=mineKの場合  
-                if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 0, 1, mineK)) {
-                    validConfigurations++;
-                }
-                
-                // mineK=0で有効な配置が0個 → セルkは必ず地雷
-                if (mineK === 0 && validConfigurations === 0) {
-                    certain.add(k);
-                    return {
-                        certain: Array.from(certain),
-                        safe: Array.from(safe),
-                        foundNew: true
-                    };
-                }
-                
-                // mineK=1で有効な配置が0個 → セルkは必ず安全
-                if (mineK === 1 && validConfigurations === 0) {
-                    safe.add(k);
-                    return {
-                        certain: Array.from(certain),
-                        safe: Array.from(safe),
-                        foundNew: true
-                    };
-                }
+            // ケース3: cellA=1, cellB=0, cellK=1
+            if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 1, 0, 1)) {
+                canBeOne = true;
+            }
+            
+            // ケース4: cellA=0, cellB=1, cellK=1
+            if (this.isValidTripleAssignment(group, constraints, cellA, cellB, k, 0, 1, 1)) {
+                canBeOne = true;
+            }
+            
+            // 確定判定
+            if (!canBeZero && canBeOne) {
+                // セルkは必ず地雷
+                certain.add(k);
+                return {
+                    certain: Array.from(certain),
+                    safe: Array.from(safe),
+                    foundNew: true
+                };
+            } else if (canBeZero && !canBeOne) {
+                // セルkは必ず安全
+                safe.add(k);
+                return {
+                    certain: Array.from(certain),
+                    safe: Array.from(safe),
+                    foundNew: true
+                };
             }
         }
-        
         return {
             certain: Array.from(certain),
             safe: Array.from(safe),
