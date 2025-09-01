@@ -118,16 +118,29 @@ class CSPSolver {
                 }
             }
         } else {
-            // フェーズ1: 全グループに制約伝播のみ適用（確定マスが見つかったら即座に中断）
+            // フェーズ1: 全グループに1セル制約伝播適用（確定マスが見つかったら即座に中断）
             let foundActionableCell = false;
             
             for (let i = 0; i < constraintGroups.length; i++) {
                 const group = constraintGroups[i];
                 this.currentProcessingGroup = group; // 現在のグループを記録
-                const hasActionable = this.applyConstraintPropagationOnly(group);
+                const hasActionable = this.applyOneCellConstraintPropagationOnly(group);
                 if (hasActionable) {
                     foundActionableCell = true;
                     break; // 確定マスが見つかったら即座に中断
+                }
+            }
+            
+            // フェーズ2: 1セル制約伝播で確定しなかった場合、全グループに2セル制約伝播適用
+            if (!foundActionableCell) {
+                for (let i = 0; i < constraintGroups.length; i++) {
+                    const group = constraintGroups[i];
+                    this.currentProcessingGroup = group; // 現在のグループを記録
+                    const hasActionable = this.applyTwoCellConstraintPropagationOnly(group);
+                    if (hasActionable) {
+                        foundActionableCell = true;
+                        break; // 確定マスが見つかったら即座に中断
+                    }
                 }
             }
             
@@ -428,7 +441,69 @@ class CSPSolver {
         return constraining;
     }
     
-    // 制約伝播のみを適用（完全探索なし）
+    // 1セル制約伝播のみを適用
+    // 戻り値: true = 0%か100%のセルが見つかった, false = 見つからなかった
+    applyOneCellConstraintPropagationOnly(group) {
+        const constraints = this.getConstraintsForGroup(group);
+        
+        // 制約がない場合は何もしない
+        if (constraints.length === 0) {
+            return false;
+        }
+        
+        // 1セル制約伝播のみで0%と100%のセルを確定
+        const determinedCells = this.determineOneCellCertainCells(group, constraints);
+        
+        // 確定したセルの確率を設定
+        for (const cellIdx of determinedCells.certain) {
+            const row = group[cellIdx].row;
+            const col = group[cellIdx].col;
+            this.probabilities[row][col] = 100;
+            this.persistentProbabilities[row][col] = 100;
+        }
+        for (const cellIdx of determinedCells.safe) {
+            const row = group[cellIdx].row;
+            const col = group[cellIdx].col;
+            this.probabilities[row][col] = 0;
+            this.persistentProbabilities[row][col] = 0;
+        }
+        
+        // 0%か100%のセルが見つかったかどうかを返す
+        return (determinedCells.certain.length > 0 || determinedCells.safe.length > 0);
+    }
+    
+    // 2セル制約伝播のみを適用
+    // 戻り値: true = 0%か100%のセルが見つかった, false = 見つからなかった
+    applyTwoCellConstraintPropagationOnly(group) {
+        const constraints = this.getConstraintsForGroup(group);
+        
+        // 制約がない場合は何もしない
+        if (constraints.length === 0) {
+            return false;
+        }
+        
+        // 2セル制約伝播のみで0%と100%のセルを確定
+        const determinedCells = this.determineTwoCellCertainCells(group, constraints);
+        
+        // 確定したセルの確率を設定
+        for (const cellIdx of determinedCells.certain) {
+            const row = group[cellIdx].row;
+            const col = group[cellIdx].col;
+            this.probabilities[row][col] = 100;
+            this.persistentProbabilities[row][col] = 100;
+        }
+        for (const cellIdx of determinedCells.safe) {
+            const row = group[cellIdx].row;
+            const col = group[cellIdx].col;
+            this.probabilities[row][col] = 0;
+            this.persistentProbabilities[row][col] = 0;
+        }
+        
+        // 0%か100%のセルが見つかったかどうかを返す
+        return (determinedCells.certain.length > 0 || determinedCells.safe.length > 0);
+    }
+    
+    // 制約伝播のみを適用（完全探索なし）- 後方互換性のため残す
     // 戻り値: true = 0%か100%のセルが見つかった, false = 見つからなかった
     applyConstraintPropagationOnly(group) {
         const constraints = this.getConstraintsForGroup(group);
@@ -1358,8 +1433,8 @@ class CSPSolver {
         return (determinedCells.certain.length > 0 || determinedCells.safe.length > 0) || foundInReducedGroup;
     }
     
-    // 制約伝播で確定できるセルを見つける
-    determineCertainCells(group, constraints) {
+    // 1セル制約伝播のみで確定できるセルを見つける
+    determineOneCellCertainCells(group, constraints) {
         const certain = new Set(); // 100%地雷
         const safe = new Set();    // 0%安全
         let changed = true;
@@ -1436,20 +1511,25 @@ class CSPSolver {
             }
         }
         
+        return {
+            certain: Array.from(certain),
+            safe: Array.from(safe)
+        };
+    }
+    
+    // 制約伝播で確定できるセルを見つける（1セル + 2セル）
+    determineCertainCells(group, constraints) {
+        // まず1セル制約伝播を試行
+        const oneCellResult = this.determineOneCellCertainCells(group, constraints);
+        
         // 1セル制約伝播で確定セルが見つかった場合は即座に返す
-        if (certain.size > 0 || safe.size > 0) {
-            return {
-                certain: Array.from(certain),
-                safe: Array.from(safe)
-            };
+        if (oneCellResult.certain.length > 0 || oneCellResult.safe.length > 0) {
+            return oneCellResult;
         }
         
         // 1セル制約伝播で確定しなかった場合のみ2セル制約伝播を試行
         const twoCellResult = this.determineTwoCellCertainCells(group, constraints);
-        return {
-            certain: twoCellResult.certain,
-            safe: twoCellResult.safe
-        };
+        return twoCellResult;
     }
     
     // 2セル制約伝播で確定できるセルを見つける
