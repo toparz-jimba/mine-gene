@@ -1457,9 +1457,26 @@ class CSPSolver {
         const certain = new Set(); // 100%地雷
         const safe = new Set();    // 0%安全
         
+        // タイムアウト設定（10秒）
+        const startTime = performance.now();
+        const timeoutMs = 10000; // 10秒
+        
         // 全セルペアについて推論を試行
         for (let i = 0; i < group.length; i++) {
             for (let j = i + 1; j < group.length; j++) {
+                // タイムアウトチェック（100ペアごと）
+                if ((i * group.length + j) % 100 === 0) {
+                    const elapsedTime = performance.now() - startTime;
+                    if (elapsedTime > timeoutMs) {
+                        console.log(`[2-CELL TIMEOUT] Processing stopped after ${elapsedTime.toFixed(0)}ms - preventing incorrect 0%/100% display`);
+                        // タイムアウト時は確定セルを返さない（誤った確率表示を防ぐ）
+                        return {
+                            certain: [],
+                            safe: [],
+                            foundNew: false
+                        };
+                    }
+                }
                 const cellA = i;
                 const cellB = j;
                 
@@ -1646,8 +1663,24 @@ class CSPSolver {
         const certain = new Set();
         const safe = new Set();
         
+        // タイムアウト設定（親関数から引き継ぎ、短時間制限）
+        const startTime = performance.now();
+        const timeoutMs = 2000; // 2秒（既に2セル制約伝播で時間を消費している可能性がある）
+        
         // 他のセルについて、排他的ORペアの制約を考慮して推論
         for (let k = 0; k < group.length; k++) {
+            // タイムアウトチェック（10セルごと）
+            if (k % 10 === 0) {
+                const elapsedTime = performance.now() - startTime;
+                if (elapsedTime > timeoutMs) {
+                    console.log(`[2-CELL EXCLUSIVE-OR TIMEOUT] Indirect inference stopped after ${elapsedTime.toFixed(0)}ms - preventing incorrect 0%/100% display`);
+                    return {
+                        certain: [],
+                        safe: [],
+                        foundNew: false
+                    };
+                }
+            }
             if (k === cellA || k === cellB) continue;
             
             // セルkが確定できるかテスト
