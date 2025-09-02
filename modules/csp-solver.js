@@ -19,6 +19,20 @@ class CSPSolver {
         this.tempGroupCache = new Map(); // 一時保存用キャッシュ
         this.previousBoardState = null; // 前回の盤面状態
         
+        // 詳細統計データ（局所制約完全性効果測定用）
+        this.stats = {
+            totalCalls: 0,
+            constraintPropagationOnly: 0,
+            localCompletenessOnly: 0,
+            fullSearchOnly: 0,
+            constraintPropagationTime: 0,
+            localCompletenessTime: 0,
+            fullSearchTime: 0,
+            twoCellSuccessCount: 0,
+            localCompletenessSuccessCount: 0,
+            groupSizeDistribution: {}  // グループサイズ別の処理回数
+        };
+        
         // WebWorkerの初期化
         if (this.useWebWorker) {
             try {
