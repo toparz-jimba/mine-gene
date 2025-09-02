@@ -8,7 +8,6 @@ class CSPSolver {
         this.persistentProbabilities = []; // 0%と100%の確率を永続的に保持
         this.timedOutCells = []; // タイムアウトされたセルの情報
         this.maxConstraintSize = 25; // 完全探索の最大サイズ
-        this.maxLocalCompletenessSize = 200; // 局所制約完全性処理の最大サイズ（大幅緩和）
         this.warningThreshold = 30; // 警告を表示するセル数の閾値
         this.maxValidConfigs = 500000; // 有効な配置の最大数を増加
         this.useWebWorker = typeof Worker !== 'undefined' && window.location.protocol !== 'file:';
@@ -19,17 +18,14 @@ class CSPSolver {
         this.tempGroupCache = new Map(); // 一時保存用キャッシュ
         this.previousBoardState = null; // 前回の盤面状態
         
-        // 詳細統計データ（局所制約完全性効果測定用）
+        // 詳細統計データ
         this.stats = {
             totalCalls: 0,
             constraintPropagationOnly: 0,
-            localCompletenessOnly: 0,
             fullSearchOnly: 0,
             constraintPropagationTime: 0,
-            localCompletenessTime: 0,
             fullSearchTime: 0,
             twoCellSuccessCount: 0,
-            localCompletenessSuccessCount: 0,
             groupSizeDistribution: {}  // グループサイズ別の処理回数
         };
         
@@ -52,7 +48,6 @@ class CSPSolver {
         this.totalExhaustiveSearches = 0;
         this.cacheHits = 0;
         this.constraintPropagationOnly = 0;
-        this.localCompletenessSuccess = 0;
         this.totalCellsProcessed = 0;
         this.timedOutCells = []; // タイムアウトセルを初期化
         
@@ -278,8 +273,6 @@ class CSPSolver {
             let processingMethod = "";
             if (this.constraintPropagationOnly > 0) {
                 processingMethod = "制約伝播";
-            } else if (this.localCompletenessSuccess > 0) {
-                processingMethod = "局所制約完全性";
             } else {
                 processingMethod = "完全探索";
             }
@@ -604,285 +597,10 @@ class CSPSolver {
         return this.solveExact(group, skipConstraintPropagation);
     }
     
-    // 局所制約完全性をチェック（セル集合が独立して解けるか判定）
-    checkLocalConstraintCompleteness(cellSet, constraintSet, allConstraints) {
-        const cellIndices = new Set(cellSet);
-        
-        // 条件1: セル集合内の各セルが関与する制約が、すべて制約集合内に含まれているか
-        for (const cellIdx of cellIndices) {
-            // このセルが関与するすべての制約を取得
-            const cellConstraints = allConstraints.filter(constraint => 
-                constraint.cells.includes(cellIdx)
-            );
-            
-            // このセルの制約がすべて制約集合に含まれているかチェック
-            for (const cellConstraint of cellConstraints) {
-                if (!constraintSet.includes(cellConstraint)) {
-                    return false; // 制約集合外の制約がセルに影響している
-                }
-            }
-        }
-        
-        // 条件2: 制約集合内の各制約が影響するセルが、すべてセル集合内に含まれているか
-        for (const constraint of constraintSet) {
-            for (const cellIdx of constraint.cells) {
-                if (!cellIndices.has(cellIdx)) {
-                    return false; // セル集合外のセルに制約が影響している
-                }
-            }
-        }
-        
-        return true; // 完全性が確認された
-    }
     
-    // 独立した部分集合を検出
-    findIndependentSubsets(group, constraints) {
-        const independentSubsets = [];
-        const processedConstraints = new Set();
-        
-        for (const constraint of constraints) {
-            if (processedConstraints.has(constraint)) continue;
-            
-            // この制約から開始して関連する制約とセルを収集
-            const relatedConstraints = [constraint];
-            const relatedCells = new Set(constraint.cells);
-            const constraintQueue = [constraint];
-            const processedInThisSet = new Set([constraint]);
-            
-            // 制約の連鎖を辿る
-            while (constraintQueue.length > 0) {
-                const currentConstraint = constraintQueue.shift();
-                
-                // この制約に関わるセルを追加
-                for (const cellIdx of currentConstraint.cells) {
-                    relatedCells.add(cellIdx);
-                }
-                
-                // セルを共有する他の制約を探す
-                for (const otherConstraint of constraints) {
-                    if (processedInThisSet.has(otherConstraint)) continue;
-                    
-                    // セルの重複をチェック
-                    const hasOverlap = otherConstraint.cells.some(cellIdx => 
-                        relatedCells.has(cellIdx)
-                    );
-                    
-                    if (hasOverlap) {
-                        relatedConstraints.push(otherConstraint);
-                        constraintQueue.push(otherConstraint);
-                        processedInThisSet.add(otherConstraint);
-                    }
-                }
-            }
-            
-            // 完全性をチェック
-            const cellArray = Array.from(relatedCells);
-            if (this.checkLocalConstraintCompleteness(cellArray, relatedConstraints, constraints)) {
-                independentSubsets.push({
-                    cells: cellArray,
-                    constraints: relatedConstraints,
-                    isComplete: true
-                });
-            }
-            
-            // 処理済みとしてマーク
-            for (const processedConstraint of relatedConstraints) {
-                processedConstraints.add(processedConstraint);
-            }
-        }
-        
-        return independentSubsets;
-    }
     
-    // 独立部分集合を完全探索で解く
-    // 戻り値: true = 0%か100%のセルが見つかった, false = 見つからなかった
-    solveIndependentSubset(subset, group) {
-        // 部分集合のセルをグループ内インデックスから実際のセル情報に変換
-        const subsetCells = subset.cells.map(idx => group[idx]);
-        
-        // サイズチェック（安全性のため）
-        if (subsetCells.length > this.maxLocalCompletenessSize) {
-            console.warn(`Independent subset too large (${subsetCells.length} cells). Skipping.`);
-            return false;
-        }
-        
-        console.log(`[LOCAL COMPLETENESS] Solving independent subset: ${subsetCells.length} cells, ${subset.constraints.length} constraints`);
-        
-        // 完全探索を実行（早期確定判定付き）
-        const validConfigurations = [];
-        const totalConfigs = Math.pow(2, subsetCells.length);
-        
-        // パフォーマンス測定用カウンター更新
-        this.totalConfigurations += totalConfigs;
-        this.totalExhaustiveSearches += 1;
-        this.totalCellsProcessed += subsetCells.length;
-        
-        // 早期確定判定用の配列（各セルが確定したかを追跡）
-        const cellStatus = new Array(subsetCells.length).fill('unknown'); // 'unknown', 'always_mine', 'always_safe', 'mixed'
-        let foundActionable = false;
-        let validConfigCount = 0;
-        
-        // タイムアウト設定（10秒）
-        const startTime = performance.now();
-        const timeoutMs = 10000; // 10秒
-        let timedOut = false;
-        
-        // すべての可能な配置を試す（早期確定判定付き＋タイムアウト）
-        for (let config = 0; config < totalConfigs; config++) {
-            // タイムアウトチェック（1000パターンごと）
-            if (config % 1000 === 0) {
-                const elapsedTime = performance.now() - startTime;
-                if (elapsedTime > timeoutMs) {
-                    timedOut = true;
-                    console.log(`[TIMEOUT] Processing stopped after ${elapsedTime.toFixed(0)}ms (${validConfigCount} valid patterns found, ${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
-                    this.totalConfigurations = config + 1; // 実際に処理したパターン数に更新
-                    break;
-                }
-            }
-            const mines = [];
-            for (let i = 0; i < subsetCells.length; i++) {
-                if ((config >> i) & 1) {
-                    mines.push(i);
-                }
-            }
-            
-            if (this.isValidConfigurationForSubset(mines, subset.constraints)) {
-                validConfigurations.push(mines);
-                validConfigCount++;
-                
-                // 早期確定判定：各セルの状態を更新
-                for (let i = 0; i < subsetCells.length; i++) {
-                    const isMine = mines.includes(i);
-                    
-                    if (cellStatus[i] === 'unknown') {
-                        // 初回の有効パターン
-                        cellStatus[i] = isMine ? 'always_mine' : 'always_safe';
-                    } else if (
-                        (cellStatus[i] === 'always_mine' && !isMine) ||
-                        (cellStatus[i] === 'always_safe' && isMine)
-                    ) {
-                        // 状態が変わった → 混在状態
-                        cellStatus[i] = 'mixed';
-                    }
-                }
-                
-                // 早期確定判定：確定マスが見つかったかチェック
-                if (validConfigCount >= 2) { // 最低2パターンは見てから判定
-                    let hasNewActionable = false;
-                    for (let i = 0; i < subsetCells.length; i++) {
-                        if (cellStatus[i] === 'always_mine' || cellStatus[i] === 'always_safe') {
-                            hasNewActionable = true;
-                            break;
-                        }
-                    }
-                    
-                    if (hasNewActionable && !foundActionable) {
-                        foundActionable = true;
-                        hasActionableCell = true; // 戻り値に反映
-                        console.log(`[EARLY TERMINATION] Found actionable cells after ${validConfigCount} valid patterns (${((config / totalConfigs) * 100).toFixed(2)}% processed)`);
-                    }
-                    
-                    // 全セル確定チェック：すべてのセルが確定したら早期終了
-                    const allCellsDetermined = cellStatus.every(status => status !== 'unknown' && status !== 'mixed');
-                    if (allCellsDetermined) {
-                        console.log(`[EARLY TERMINATION] All cells determined after ${validConfigCount} valid patterns. Stopping early.`);
-                        this.totalConfigurations = config + 1; // 実際に処理したパターン数に更新
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // 有効な配置から確率を計算（タイムアウト時は部分計算）
-        let hasActionableCell = false;
-        if (validConfigurations.length > 0) {
-            if (timedOut) {
-                console.log(`[TIMEOUT] Partial results from ${validConfigurations.length} valid configurations - hiding probabilities for incomplete calculations`);
-                // タイムアウト時は確率を非表示にする（-1で未計算状態を維持）
-                for (const cell of subsetCells) {
-                    this.probabilities[cell.row][cell.col] = -1;
-                    // タイムアウトセルとして記録
-                    this.timedOutCells.push({ row: cell.row, col: cell.col });
-                }
-            } else {
-                // 正常完了時のみ確率を計算・表示
-                for (let i = 0; i < subsetCells.length; i++) {
-                    let mineCount = 0;
-                    for (const config of validConfigurations) {
-                        if (config.includes(i)) {
-                            mineCount++;
-                        }
-                    }
-                    const probability = Math.round((mineCount / validConfigurations.length) * 100);
-                    const cell = subsetCells[i];
-                    this.probabilities[cell.row][cell.col] = probability;
-                    
-                    // 0%または100%の場合は永続的に保存
-                    if (probability === 0 || probability === 100) {
-                        this.persistentProbabilities[cell.row][cell.col] = probability;
-                        hasActionableCell = true;
-                    }
-                }
-            }
-        } else {
-            // 有効な配置がない場合（エラー状態またはタイムアウト）
-            if (timedOut) {
-                console.warn('Timed out before finding any valid configurations. Hiding probabilities.');
-                // タイムアウト時は確率を非表示にする
-                for (const cell of subsetCells) {
-                    this.probabilities[cell.row][cell.col] = -1;
-                    // タイムアウトセルとして記録
-                    this.timedOutCells.push({ row: cell.row, col: cell.col });
-                }
-            } else {
-                console.warn('No valid configurations found for independent subset');
-                // エラー状態のみデフォルト値を使用
-                for (const cell of subsetCells) {
-                    this.probabilities[cell.row][cell.col] = 50;
-                }
-            }
-        }
-        
-        return hasActionableCell;
-    }
     
-    // 独立部分集合用の配置検証
-    isValidConfigurationForSubset(mineIndices, constraints) {
-        // 各制約をチェック
-        for (const constraint of constraints) {
-            let actualMines = 0;
-            
-            for (const cellIndex of constraint.cells) {
-                if (mineIndices.includes(cellIndex)) {
-                    actualMines++;
-                }
-            }
-            
-            // 必要な地雷数をチェック（旗の数は既に引かれている）
-            if (actualMines !== constraint.requiredMines) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
     
-    // 確定マス以外のセルを計算中断としてマーク
-    markRemainingCellsAsInterrupted(group) {
-        let interruptedCount = 0;
-        
-        for (const cell of group) {
-            const currentProb = this.probabilities[cell.row][cell.col];
-            
-            // 未計算(-1)、または確定マス以外の確率値の場合
-            if (currentProb === -1 || (currentProb !== 0 && currentProb !== 100 && currentProb !== -2)) {
-                this.probabilities[cell.row][cell.col] = -3; // 計算中断
-                interruptedCount++;
-            }
-        }
-        
-        console.log(`[LOCAL COMPLETENESS] Marked ${interruptedCount} cells as calculation interrupted (-3)`);
-    }
     
     // 2セル制約伝播で参考になったセルをマーク
     markTwoCellReferenceCells(group, cellA, cellB) {
@@ -1114,7 +832,7 @@ class CSPSolver {
         }
         
         // セル数チェック（単一制約でも大きすぎる場合は通常の処理に委ねる）
-        if (cellCount > this.maxLocalCompletenessSize) {
+        if (cellCount > this.maxConstraintSize) {
             return null;
         }
         
@@ -1296,7 +1014,7 @@ class CSPSolver {
             determinedCells = this.determineCertainCells(group, constraints);
             
             // デバッグ情報（大きなグループの場合のみ）
-            if (group.length > this.maxLocalCompletenessSize) {
+            if (group.length > this.maxConstraintSize) {
                 console.log(`Constraint propagation: ${determinedCells.certain.length} mines, ${determinedCells.safe.length} safe cells confirmed`);
             }
             
@@ -1317,51 +1035,6 @@ class CSPSolver {
             hasActionableFromPropagation = (determinedCells.certain.length > 0 || determinedCells.safe.length > 0);
         }
         
-        // STEP 2: 局所制約完全性チェック（制約伝播とは独立して実行）
-        if (!hasActionableFromPropagation) {
-            // グループサイズが局所制約完全性の制限内かチェック
-            if (group.length <= this.maxLocalCompletenessSize) {
-                console.log(`[LOCAL COMPLETENESS] Analyzing group of ${group.length} cells for independent subsets...`);
-                const independentSubsets = this.findIndependentSubsets(group, constraints);
-                
-                if (independentSubsets.length > 0) {
-                    console.log(`[LOCAL COMPLETENESS] Found ${independentSubsets.length} independent subset(s): ${independentSubsets.map(s => s.cells.length + ' cells').join(', ')}`);
-                    
-                    // グループ全体が1つの部分集合の場合は独立性なし（早期判定）
-                    if (independentSubsets.length === 1 && independentSubsets[0].cells.length === group.length) {
-                        console.log(`[LOCAL COMPLETENESS] No true independence found - entire group is interconnected (${group.length} cells)`);
-                        console.log(`[LOCAL COMPLETENESS] Skipping local completeness processing for non-independent group`);
-                    } else {
-                        // 小さな独立部分集合があれば優先的に処理
-                        for (const subset of independentSubsets) {
-                        if (subset.cells.length <= this.maxLocalCompletenessSize) {
-                            const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
-                            if (hasActionableFromSubset) {
-                                console.log(`[LOCAL COMPLETENESS] Found actionable cells in independent subset of ${subset.cells.length} cells`);
-                                console.log(`[LOCAL COMPLETENESS] Early return - marking remaining cells as calculation interrupted`);
-                                
-                                // 確定マス以外は「計算中断」としてマーク
-                                this.markRemainingCellsAsInterrupted(group);
-                                
-                                this.localCompletenessSuccess = 1; // 局所制約完全性成功をマーク
-                                return true; // 確定マスが見つかったので早期終了
-                            } else {
-                                console.log(`[LOCAL COMPLETENESS] No actionable cells found in subset of ${subset.cells.length} cells`);
-                            }
-                        } else {
-                            console.log(`[LOCAL COMPLETENESS] Skipping large subset of ${subset.cells.length} cells (exceeds limit of ${this.maxLocalCompletenessSize})`);
-                        }
-                        }
-                        console.log(`[LOCAL COMPLETENESS] All independent subsets processed. No actionable cells found.`);
-                    }
-                } else {
-                    console.log(`[LOCAL COMPLETENESS] No independent subsets found in group of ${group.length} cells`);
-                }
-            } else {
-                console.log(`[LOCAL COMPLETENESS] Group too large for local completeness (${group.length} > ${this.maxLocalCompletenessSize} cells). Skipping group.`);
-                // グループが大きすぎる場合はスキップ（近似機能は廃止）
-            }
-        }
         
         // STEP 3: 単純制約パターンの直接計算（一時的にコメントアウト）
         /*
@@ -1398,46 +1071,18 @@ class CSPSolver {
         );
         
         // グループが大きすぎる場合は完全探索をスキップ
-        if (uncertainIndices.length > this.maxLocalCompletenessSize) {
-            console.warn(`Uncertain group too large (${uncertainIndices.length} cells > ${this.maxLocalCompletenessSize}). Skipping full search.`);
+        if (uncertainIndices.length > this.maxConstraintSize) {
+            console.warn(`Uncertain group too large (${uncertainIndices.length} cells > ${this.maxConstraintSize}). Skipping full search.`);
             
-            // 局所制約完全性処理を試行（グループサイズが制限内の場合）
-            let hasActionableFromLocal = false;
-            if (group.length <= this.maxLocalCompletenessSize) {
-                console.log(`[LOCAL COMPLETENESS] Trying local completeness after full search skip for group of ${group.length} cells...`);
-                const independentSubsets = this.findIndependentSubsets(group, constraints);
-                
-                if (independentSubsets.length > 0) {
-                    console.log(`[LOCAL COMPLETENESS] Found ${independentSubsets.length} independent subset(s): ${independentSubsets.map(s => s.cells.length + ' cells').join(', ')}`);
-                    
-                    // グループ全体が1つの部分集合の場合は独立性なし（早期判定）
-                    if (independentSubsets.length === 1 && independentSubsets[0].cells.length === group.length) {
-                        console.log(`[LOCAL COMPLETENESS] No true independence found - entire group is interconnected (${group.length} cells)`);
-                        console.log(`[LOCAL COMPLETENESS] Skipping local completeness processing for non-independent group`);
-                    } else {
-                        for (const subset of independentSubsets) {
-                        if (subset.cells.length <= this.maxLocalCompletenessSize) {
-                            const hasActionableFromSubset = this.solveIndependentSubset(subset, group);
-                            if (hasActionableFromSubset) {
-                                console.log(`[LOCAL COMPLETENESS] Found actionable cells in independent subset of ${subset.cells.length} cells`);
-                                hasActionableFromLocal = true;
-                                break; // 1つでも確定マスが見つかれば成功
-                            }
-                        }
-                        }
-                    }
-                }
-            }
-            
-            // 局所制約完全性でも確定しなかったセルを-4（完全探索スキップ）としてマーク
+            // 確定しなかったセルを-4（完全探索スキップ）としてマーク
             for (const idx of uncertainIndices) {
                 if (this.probabilities[group[idx].row][group[idx].col] === -1) {
                     this.probabilities[group[idx].row][group[idx].col] = -4;
                 }
             }
             
-            // 制約伝播または局所制約完全性で0%/100%が見つかっていればtrueを返す
-            return (determinedCells.certain.length > 0 || determinedCells.safe.length > 0 || hasActionableFromLocal);
+            // 制約伝播で0%/100%が見つかっていればtrueを返す
+            return (determinedCells.certain.length > 0 || determinedCells.safe.length > 0);
         }
         
         // 不確定なセルのみで完全探索
