@@ -168,6 +168,16 @@ class PCMinesweeper extends MinesweeperCore {
             });
         }
         
+        // クリアモーダルの外側クリックで閉じる
+        const clearModal = document.getElementById('clear-modal');
+        if (clearModal) {
+            clearModal.addEventListener('click', (e) => {
+                if (e.target === clearModal) {
+                    this.closeClearModal();
+                }
+            });
+        }
+        
         
         // ドラッグイベントの設定
         this.setupDragEvents();
@@ -815,6 +825,13 @@ class PCMinesweeper extends MinesweeperCore {
     
     closeHelp() {
         const modal = document.getElementById('help-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+    
+    closeClearModal() {
+        const modal = document.getElementById('clear-modal');
         if (modal) {
             modal.classList.remove('show');
         }
