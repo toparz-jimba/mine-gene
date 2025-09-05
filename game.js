@@ -16,6 +16,15 @@ class PCProMinesweeper extends PCMinesweeper {
         // 補助機能の視覚表示設定
         this.assistVisualEnabled = true;
         
+        // 盤面管理機能
+        this.isEditorMode = false;
+        this.isEditingFromSavedBoard = false; // 保存済み盤面からの編集かどうか
+        this.editorMines = new Set(); // エディター用地雷配置 "row,col"形式
+        this.editorRevealed = new Set(); // エディター用開いた状態のマス "row,col"形式
+        this.continuousPlacement = false; // 連続配置モード
+        this.editorMode = 'mine'; // 'mine' または 'reveal'
+        this.savedGameState = null; // メインゲームの状態を保存
+        
         this.initPro();
     }
     
@@ -50,6 +59,12 @@ class PCProMinesweeper extends PCMinesweeper {
         const assistVisualToggleBtn = document.getElementById('assist-visual-toggle-btn');
         if (assistVisualToggleBtn) {
             assistVisualToggleBtn.addEventListener('click', () => this.toggleAssistVisual());
+        }
+        
+        // 盤面管理ボタン
+        const boardManagerBtn = document.getElementById('board-manager-btn');
+        if (boardManagerBtn) {
+            boardManagerBtn.addEventListener('click', () => this.openBoardManager());
         }
         
         // キーボードショートカット
@@ -986,6 +1001,1005 @@ class PCProMinesweeper extends PCMinesweeper {
         }
         if (this.assistMode && this.cspSolver) {
             this.calculateAndDisplayAssist();
+        }
+    }
+    
+    // 盤面管理機能
+    openBoardManager() {
+        const modal = document.getElementById('board-manager-modal');
+        if (modal) {
+            modal.classList.add('show');
+            this.setupBoardManagerEvents();
+            this.loadSavedBoards();
+        }
+    }
+    
+    closeBoardManager() {
+        const modal = document.getElementById('board-manager-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        // 保存済み盤面の編集から開始された編集モードの場合は継続する
+        if (this.isEditorMode && !this.isEditingFromSavedBoard) {
+            this.exitEditorMode();
+        }
+    }
+    
+    setupBoardManagerEvents() {
+        // 既存のイベントリスナーがある場合は削除
+        this.removeBoardManagerEvents();
+        
+        // タブ切り替え
+        this.savedBoardsTabHandler = () => this.showTab('saved-boards');
+        this.boardEditorTabHandler = () => this.showTab('board-editor');
+        this.importExportTabHandler = () => this.showTab('import-export');
+        
+        document.getElementById('saved-boards-tab')?.addEventListener('click', this.savedBoardsTabHandler);
+        document.getElementById('board-editor-tab')?.addEventListener('click', this.boardEditorTabHandler);
+        document.getElementById('import-export-tab')?.addEventListener('click', this.importExportTabHandler);
+        
+        // 閉じるボタン
+        this.closeBoardManagerHandler = () => this.closeBoardManager();
+        document.getElementById('close-board-manager')?.addEventListener('click', this.closeBoardManagerHandler);
+        
+        // 現在の盤面を保存
+        this.saveCurrentBoardHandler = () => this.saveCurrentBoard();
+        document.getElementById('save-current-board')?.addEventListener('click', this.saveCurrentBoardHandler);
+        
+        // エディター機能
+        this.mineModeHandler = () => this.setEditorMode('mine');
+        this.revealModeHandler = () => this.setEditorMode('reveal');
+        this.saveEditedBoardHandler = () => this.saveEditedBoard();
+        this.testBoardHandler = () => this.testBoard();
+        
+        document.getElementById('mine-mode-btn')?.addEventListener('click', this.mineModeHandler);
+        document.getElementById('reveal-mode-btn')?.addEventListener('click', this.revealModeHandler);
+        document.getElementById('save-edited-board')?.addEventListener('click', this.saveEditedBoardHandler);
+        document.getElementById('test-board-btn')?.addEventListener('click', this.testBoardHandler);
+        
+        // インポート/エクスポート
+        this.exportCurrentHandler = () => this.exportCurrentBoard();
+        this.importBoardHandler = () => this.importBoard();
+        this.copyExportHandler = () => this.copyExportCode();
+        
+        document.getElementById('export-current-btn')?.addEventListener('click', this.exportCurrentHandler);
+        document.getElementById('import-board-btn')?.addEventListener('click', this.importBoardHandler);
+        document.getElementById('copy-export-btn')?.addEventListener('click', this.copyExportHandler);
+        
+        // 検索機能
+        this.boardSearchHandler = (e) => this.filterSavedBoards(e.target.value);
+        document.getElementById('board-search-input')?.addEventListener('input', this.boardSearchHandler);
+        
+        // モーダル外クリックで閉じる
+        this.modalClickHandler = (e) => {
+            const modal = document.getElementById('board-manager-modal');
+            if (e.target === modal) {
+                this.closeBoardManager();
+            }
+        };
+        document.getElementById('board-manager-modal')?.addEventListener('click', this.modalClickHandler);
+    }
+    
+    removeBoardManagerEvents() {
+        document.getElementById('saved-boards-tab')?.removeEventListener('click', this.savedBoardsTabHandler);
+        document.getElementById('board-editor-tab')?.removeEventListener('click', this.boardEditorTabHandler);
+        document.getElementById('import-export-tab')?.removeEventListener('click', this.importExportTabHandler);
+        document.getElementById('close-board-manager')?.removeEventListener('click', this.closeBoardManagerHandler);
+        document.getElementById('save-current-board')?.removeEventListener('click', this.saveCurrentBoardHandler);
+        document.getElementById('mine-mode-btn')?.removeEventListener('click', this.mineModeHandler);
+        document.getElementById('reveal-mode-btn')?.removeEventListener('click', this.revealModeHandler);
+        document.getElementById('save-edited-board')?.removeEventListener('click', this.saveEditedBoardHandler);
+        document.getElementById('test-board-btn')?.removeEventListener('click', this.testBoardHandler);
+        document.getElementById('export-current-btn')?.removeEventListener('click', this.exportCurrentHandler);
+        document.getElementById('import-board-btn')?.removeEventListener('click', this.importBoardHandler);
+        document.getElementById('copy-export-btn')?.removeEventListener('click', this.copyExportHandler);
+        document.getElementById('board-search-input')?.removeEventListener('input', this.boardSearchHandler);
+        document.getElementById('board-manager-modal')?.removeEventListener('click', this.modalClickHandler);
+    }
+    
+    showTab(tabName) {
+        // 全タブを非アクティブ化
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // 選択したタブをアクティブ化
+        document.getElementById(tabName + '-tab')?.classList.add('active');
+        document.getElementById(tabName + '-content')?.classList.add('active');
+        
+        if (tabName === 'board-editor') {
+            this.enterEditorMode();
+        } else if (this.isEditorMode) {
+            this.exitEditorMode();
+        }
+    }
+    
+    // 軽量化データ形式での盤面データ作成（地雷配置のみ保存）
+    createBoardData(name = '') {
+        const mines = [];
+        
+        console.log('Creating board data. isEditorMode:', this.isEditorMode, 'firstClick:', this.firstClick);
+        console.log('Board state:', this.board ? 'exists' : 'null');
+        
+        // 現在のボードから地雷位置を抽出
+        if (this.isEditorMode) {
+            // エディターモードでは editorMines を使用
+            console.log('Using editor mines:', Array.from(this.editorMines));
+            this.editorMines.forEach(minePos => {
+                const [row, col] = minePos.split(',').map(Number);
+                mines.push([row, col]);
+            });
+        } else {
+            // ゲームモードでは実際のボードを使用
+            console.log('Checking game board for mines...');
+            
+            if (this.firstClick) {
+                console.warn('Game not started yet - no mines placed');
+                return null; // ゲームが開始されていない場合はnullを返す
+            }
+            
+            for (let row = 0; row < this.rows; row++) {
+                for (let col = 0; col < this.cols; col++) {
+                    if (this.board && this.board[row] && this.board[row][col] === -1) {
+                        mines.push([row, col]);
+                        console.log('Found mine at:', [row, col]);
+                    }
+                }
+            }
+        }
+        
+        console.log('Extracted mines:', mines);
+        
+        // 開いた状態の情報を抽出
+        const revealedCells = [];
+        if (this.isEditorMode) {
+            // エディターモードでは editorRevealed を使用
+            this.editorRevealed.forEach(cellPos => {
+                const [row, col] = cellPos.split(',').map(Number);
+                revealedCells.push([row, col]);
+            });
+        }
+        
+        const boardData = {
+            name: name,
+            timestamp: Date.now(),
+            rows: this.rows,
+            cols: this.cols,
+            mines: mines,
+            revealedCells: revealedCells,
+            difficulty: this.currentDifficulty
+        };
+        
+        console.log('Created board data:', boardData);
+        
+        return boardData;
+    }
+    
+    saveCurrentBoard() {
+        // ゲームが開始されているか確認
+        if (this.firstClick && !this.isEditorMode) {
+            alert('まず盤面をクリックしてゲームを開始してください');
+            return;
+        }
+        
+        const name = prompt('盤面名を入力してください:', `盤面_${new Date().toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'})}`);
+        if (!name) return;
+        
+        const boardData = this.createBoardData(name);
+        if (!boardData) {
+            alert('盤面データの作成に失敗しました');
+            return;
+        }
+        
+        this.saveBoardToStorage(boardData);
+        this.loadSavedBoards();
+        
+        alert('盤面を保存しました: ' + name);
+    }
+    
+    saveBoardToStorage(boardData) {
+        const savedBoards = this.getSavedBoards();
+        
+        // 同じ名前の盤面があれば上書き確認
+        const existingIndex = savedBoards.findIndex(board => board.name === boardData.name);
+        if (existingIndex !== -1) {
+            if (!confirm('同じ名前の盤面が存在します。上書きしますか？')) {
+                return false;
+            }
+            savedBoards[existingIndex] = boardData;
+        } else {
+            savedBoards.push(boardData);
+        }
+        
+        // 最新のものから順に並び替え
+        savedBoards.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // 上限設定（100個まで）
+        if (savedBoards.length > 100) {
+            savedBoards.splice(100);
+        }
+        
+        localStorage.setItem('minesweeper-saved-boards', JSON.stringify(savedBoards));
+        return true;
+    }
+    
+    getSavedBoards() {
+        const saved = localStorage.getItem('minesweeper-saved-boards');
+        return saved ? JSON.parse(saved) : [];
+    }
+    
+    loadSavedBoards() {
+        const savedBoards = this.getSavedBoards();
+        const listElement = document.getElementById('saved-boards-list');
+        
+        if (savedBoards.length === 0) {
+            listElement.innerHTML = '<div class="empty-state">保存された盤面がありません</div>';
+            return;
+        }
+        
+        listElement.innerHTML = '';
+        
+        savedBoards.forEach(boardData => {
+            const boardItem = this.createBoardListItem(boardData);
+            listElement.appendChild(boardItem);
+        });
+    }
+    
+    createBoardListItem(boardData) {
+        const item = document.createElement('div');
+        item.className = 'board-item';
+        
+        const date = new Date(boardData.timestamp).toLocaleString('ja-JP');
+        const mineCount = boardData.mines.length;
+        const revealedCount = boardData.revealedCells ? boardData.revealedCells.length : 0;
+        
+        item.innerHTML = `
+            <div class="board-item-info">
+                <h4 class="board-name">${this.escapeHtml(boardData.name)}</h4>
+                <div class="board-details">
+                    <span>${boardData.rows}×${boardData.cols}</span>
+                    <span>地雷${mineCount}個</span>
+                    ${revealedCount > 0 ? `<span>開始${revealedCount}個</span>` : ''}
+                    <span>${date}</span>
+                </div>
+            </div>
+            <div class="board-item-actions">
+                <button class="board-btn primary" data-action="load">読み込み</button>
+                <button class="board-btn secondary" data-action="edit">編集</button>
+                <button class="board-btn danger" data-action="delete">削除</button>
+            </div>
+        `;
+        
+        // イベントリスナー追加
+        item.querySelector('[data-action="load"]').addEventListener('click', () => {
+            this.loadBoard(boardData);
+        });
+        
+        item.querySelector('[data-action="edit"]').addEventListener('click', () => {
+            this.editBoard(boardData);
+        });
+        
+        item.querySelector('[data-action="delete"]').addEventListener('click', () => {
+            this.deleteBoard(boardData);
+        });
+        
+        return item;
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    loadBoard(boardData) {
+        console.log('Loading board:', boardData);
+        
+        // ゲーム初期状態でその盤面をロード（新しいゲームとして開始）
+        this.currentDifficulty = boardData.difficulty || 'easy';
+        const difficultySelect = document.getElementById('difficulty-select');
+        if (difficultySelect) {
+            difficultySelect.value = this.currentDifficulty;
+        }
+        
+        // ボード初期化
+        this.initBoard(boardData.rows, boardData.cols, boardData.mines.length);
+        
+        // 地雷配置を設定
+        this.board = Array(boardData.rows).fill(null).map(() => Array(boardData.cols).fill(0));
+        boardData.mines.forEach(([row, col]) => {
+            if (row < boardData.rows && col < boardData.cols) {
+                this.board[row][col] = -1;
+            }
+        });
+        
+        console.log('Board after mine placement:', this.board);
+        
+        // 周囲の数字を計算
+        this.calculateNumbers();
+        
+        console.log('Board after number calculation:', this.board);
+        
+        // 新しいゲーム状態で開始
+        this.revealed = Array(boardData.rows).fill(null).map(() => Array(boardData.cols).fill(false));
+        this.flagged = Array(boardData.rows).fill(null).map(() => Array(boardData.cols).fill(false));
+        this.questioned = Array(boardData.rows).fill(null).map(() => Array(boardData.cols).fill(false));
+        
+        // 保存された開いた状態を適用
+        if (boardData.revealedCells && boardData.revealedCells.length > 0) {
+            boardData.revealedCells.forEach(([row, col]) => {
+                if (row < boardData.rows && col < boardData.cols) {
+                    this.revealed[row][col] = true;
+                }
+            });
+        }
+        
+        this.gameOver = false;
+        this.gameWon = false;
+        this.timer = 0;
+        this.firstClick = false; // 地雷は既に配置済み
+        
+        // 地雷数と設定を更新
+        this.mineCount = boardData.mines.length;
+        this.totalMines = boardData.mines.length;
+        
+        // タイマーを停止
+        this.stopTimer();
+        
+        // UI更新
+        this.renderBoard();
+        this.updateMineCount();
+        this.updateTimer();
+        
+        // 確率・補助表示をクリア
+        if (this.probabilityMode) {
+            this.clearProbabilityDisplay();
+        }
+        if (this.assistMode) {
+            this.clearAssistDisplay();
+        }
+        
+        // モーダルを閉じる
+        this.closeBoardManager();
+        
+        alert(`盤面「${boardData.name}」を読み込みました`);
+    }
+    
+    calculateNumbers() {
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                if (this.board[row][col] !== -1) {
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const newRow = row + dr;
+                            const newCol = col + dc;
+                            if (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] === -1) {
+                                count++;
+                            }
+                        }
+                    }
+                    this.board[row][col] = count;
+                }
+            }
+        }
+    }
+    
+    deleteBoard(boardData) {
+        if (!confirm(`盤面「${boardData.name}」を削除しますか？`)) return;
+        
+        const savedBoards = this.getSavedBoards();
+        const filteredBoards = savedBoards.filter(board => 
+            !(board.name === boardData.name && board.timestamp === boardData.timestamp)
+        );
+        
+        localStorage.setItem('minesweeper-saved-boards', JSON.stringify(filteredBoards));
+        this.loadSavedBoards();
+        
+        alert(`盤面「${boardData.name}」を削除しました`);
+    }
+    
+    filterSavedBoards(searchTerm) {
+        const items = document.querySelectorAll('.board-item');
+        const term = searchTerm.toLowerCase();
+        
+        items.forEach(item => {
+            const name = item.querySelector('.board-name').textContent.toLowerCase();
+            item.style.display = name.includes(term) ? 'block' : 'none';
+        });
+    }
+    
+    // エディター機能
+    setEditorMode(mode) {
+        this.editorMode = mode;
+        
+        // ボタンのスタイルを更新
+        const mineModeBtn = document.getElementById('mine-mode-btn');
+        const revealModeBtn = document.getElementById('reveal-mode-btn');
+        
+        if (mode === 'mine') {
+            mineModeBtn?.classList.add('primary');
+            mineModeBtn?.classList.remove('secondary');
+            revealModeBtn?.classList.add('secondary');
+            revealModeBtn?.classList.remove('primary');
+        } else if (mode === 'reveal') {
+            revealModeBtn?.classList.add('primary');
+            revealModeBtn?.classList.remove('secondary');
+            mineModeBtn?.classList.add('secondary');
+            mineModeBtn?.classList.remove('primary');
+        }
+        
+        this.updateEditorInstructions();
+        
+        // ボード表示を更新
+        if (this.isEditorMode) {
+            this.renderEditorBoard();
+        }
+    }
+    
+    updateEditorInstructions() {
+        const instructions = document.querySelector('.editor-instructions p');
+        if (!instructions) return;
+        
+        if (this.editorMode === 'mine') {
+            if (this.continuousPlacement) {
+                instructions.textContent = '地雷配置モード: 連続配置モード ON - マウスオーバーで地雷を配置/削除します。右クリックで連続配置モードを OFF にできます。';
+            } else {
+                instructions.textContent = '地雷配置モード: クリックで地雷を配置/削除できます。右クリックで連続配置モードを切り替えできます。';
+            }
+        } else if (this.editorMode === 'reveal') {
+            instructions.textContent = '開く設定モード: クリックでマスの開く/閉じる状態を設定できます。地雷が配置されたマスは設定できません。';
+        }
+    }
+    
+    enterEditorMode() {
+        console.log('Entering editor mode');
+        this.isEditorMode = true;
+        
+        // 保存済み盤面の編集以外では、このフラグをfalseにする
+        if (!this.isEditingFromSavedBoard) {
+            this.isEditingFromSavedBoard = false;
+        }
+        
+        // 現在のゲーム状態を保存
+        this.saveCurrentGameState();
+        
+        // 現在の盤面の地雷配置をエディター用にコピー（editBoardから呼ばれた場合はスキップ）
+        if (this.editorMines.size === 0) {
+            console.log('Copying mines from current board to editor');
+            for (let row = 0; row < this.rows; row++) {
+                for (let col = 0; col < this.cols; col++) {
+                    if (this.board && this.board[row] && this.board[row][col] === -1) {
+                        this.editorMines.add(`${row},${col}`);
+                    }
+                }
+            }
+        }
+        
+        console.log('Editor mines before display update:', Array.from(this.editorMines));
+        
+        // デフォルトで地雷配置モードに設定
+        this.setEditorMode('mine');
+        
+        this.updateEditorDisplay();
+        this.renderEditorBoard();
+        
+        // ボードのタイトルを変更
+        const title = document.getElementById('board-manager-title');
+        if (title) {
+            title.textContent = '盤面エディター';
+        }
+    }
+    
+    saveCurrentGameState() {
+        // 現在のメインゲームの状態を保存
+        this.savedGameState = {
+            board: this.board ? this.board.map(row => [...row]) : null,
+            revealed: this.revealed ? this.revealed.map(row => [...row]) : null,
+            flagged: this.flagged ? this.flagged.map(row => [...row]) : null,
+            questioned: this.questioned ? this.questioned.map(row => [...row]) : null,
+            rows: this.rows,
+            cols: this.cols,
+            totalMines: this.totalMines,
+            mineCount: this.mineCount,
+            gameOver: this.gameOver,
+            gameWon: this.gameWon,
+            timer: this.timer,
+            firstClick: this.firstClick,
+            currentDifficulty: this.currentDifficulty
+        };
+    }
+    
+    restoreGameState() {
+        if (!this.savedGameState) {
+            // 保存された状態がない場合は元のボード表示
+            this.renderBoard();
+            return;
+        }
+        
+        // ゲーム状態を復元
+        const state = this.savedGameState;
+        this.board = state.board;
+        this.revealed = state.revealed;
+        this.flagged = state.flagged;
+        this.questioned = state.questioned;
+        this.rows = state.rows;
+        this.cols = state.cols;
+        this.totalMines = state.totalMines;
+        this.mineCount = state.mineCount;
+        this.gameOver = state.gameOver;
+        this.gameWon = state.gameWon;
+        this.timer = state.timer;
+        this.firstClick = state.firstClick;
+        this.currentDifficulty = state.currentDifficulty;
+        
+        // 画面を更新
+        this.renderBoard();
+        this.updateMineCount();
+        this.updateTimer();
+        
+        // 保存された状態をクリア
+        this.savedGameState = null;
+    }
+    
+    exitEditorMode() {
+        this.isEditorMode = false;
+        
+        // 保存済み盤面編集フラグをリセット
+        this.isEditingFromSavedBoard = false;
+        
+        // エディターモード用のクラスを削除
+        const boardElement = document.getElementById('game-board');
+        if (boardElement) {
+            boardElement.classList.remove('editor-mode');
+        }
+        
+        // 保存されたゲーム状態を復元
+        this.restoreGameState();
+        
+        // タイトルを戻す
+        const title = document.getElementById('board-manager-title');
+        if (title) {
+            title.textContent = '盤面管理';
+        }
+    }
+    
+    renderEditorBoard() {
+        const boardElement = document.getElementById('game-board');
+        boardElement.innerHTML = '';
+        boardElement.style.gridTemplateColumns = `repeat(${this.cols}, 1fr)`;
+        
+        // エディターモード用のクラス追加
+        boardElement.classList.add('editor-mode');
+        
+        // ボード要素で右クリックメニューを無効化
+        boardElement.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell editor-cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                
+                this.setupEditorCellEventListeners(cell, row, col);
+                this.updateEditorCell(row, col, cell);
+                
+                boardElement.appendChild(cell);
+            }
+        }
+    }
+    
+    setupEditorCellEventListeners(cell, row, col) {
+        // 左クリック: モードに応じた操作
+        cell.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (this.editorMode === 'mine') {
+                this.toggleMineInEditor(row, col);
+            } else if (this.editorMode === 'reveal') {
+                this.toggleRevealInEditor(row, col);
+            }
+        });
+        
+        // 右クリック: 連続配置モードトグル（地雷モードのみ）
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (this.editorMode === 'mine') {
+                this.continuousPlacement = !this.continuousPlacement;
+                this.updateEditorInstructions();
+            }
+        });
+        
+        // マウスオーバー: 連続配置モード時
+        cell.addEventListener('mouseenter', () => {
+            if (this.continuousPlacement && this.editorMode === 'mine') {
+                this.toggleMineInEditor(row, col);
+            }
+        });
+    }
+    
+    toggleMineInEditor(row, col) {
+        const key = `${row},${col}`;
+        
+        if (this.editorMines.has(key)) {
+            this.editorMines.delete(key);
+        } else {
+            // 地雷を配置する場合、そのマスの開く設定を削除
+            this.editorMines.add(key);
+            if (this.editorRevealed.has(key)) {
+                this.editorRevealed.delete(key);
+            }
+        }
+        
+        // セル表示を更新
+        const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (cell) {
+            this.updateEditorCell(row, col, cell);
+        }
+        
+        // 統計表示を更新
+        this.updateEditorDisplay();
+    }
+    
+    toggleRevealInEditor(row, col) {
+        const key = `${row},${col}`;
+        
+        // 地雷が配置されているマスは開く設定できない
+        if (this.editorMines.has(key)) {
+            return;
+        }
+        
+        if (this.editorRevealed.has(key)) {
+            this.editorRevealed.delete(key);
+        } else {
+            this.editorRevealed.add(key);
+        }
+        
+        // セル表示を更新
+        const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (cell) {
+            this.updateEditorCell(row, col, cell);
+        }
+    }
+    
+    updateEditorCell(row, col, cell) {
+        const key = `${row},${col}`;
+        
+        // クラスをクリア
+        cell.classList.remove('editor-mine', 'editor-revealed');
+        cell.textContent = '';
+        
+        if (this.editorMines.has(key)) {
+            cell.classList.add('editor-mine');
+            cell.textContent = '💣';
+            console.log(`Cell (${row},${col}) marked as mine`);
+        } else if (this.editorRevealed.has(key)) {
+            cell.classList.add('editor-revealed');
+            cell.textContent = '✓';
+            console.log(`Cell (${row},${col}) marked as revealed`);
+        }
+    }
+    
+    updateEditorDisplay() {
+        const mineCountDisplay = document.getElementById('mine-count-display');
+        const boardSizeDisplay = document.getElementById('board-size-display');
+        
+        console.log('Updating editor display - mine count:', this.editorMines.size);
+        
+        if (mineCountDisplay) {
+            mineCountDisplay.textContent = this.editorMines.size;
+        }
+        
+        if (boardSizeDisplay) {
+            boardSizeDisplay.textContent = `${this.rows}×${this.cols}`;
+        }
+    }
+    
+    
+    saveEditedBoard() {
+        const nameInput = document.getElementById('board-name-input');
+        const name = nameInput ? nameInput.value.trim() : '';
+        
+        if (!name) {
+            alert('盤面名を入力してください');
+            return;
+        }
+        
+        if (this.editorMines.size === 0) {
+            alert('地雷を配置してください');
+            return;
+        }
+        
+        const boardData = this.createBoardData(name);
+        this.saveBoardToStorage(boardData);
+        
+        alert(`盤面「${name}」を保存しました`);
+        
+        // 盤面名をクリア
+        if (nameInput) {
+            nameInput.value = '';
+        }
+        
+        // 保存済み盤面リストを更新
+        this.loadSavedBoards();
+    }
+    
+    testBoard() {
+        if (this.editorMines.size === 0) {
+            alert('地雷を配置してください');
+            return;
+        }
+        
+        // エディターの盤面をテスト用に適用
+        const boardData = this.createBoardData('テスト盤面');
+        
+        
+        // ゲームモードに戻す
+        this.exitEditorMode();
+        
+        // テスト盤面をロード
+        this.loadBoard(boardData);
+    }
+    
+    editBoard(boardData) {
+        console.log('Editing board:', boardData);
+        
+        // 保存済み盤面からの編集であることをマーク
+        this.isEditingFromSavedBoard = true;
+        
+        // エディタータブに切り替え
+        this.showTab('board-editor');
+        
+        // ボードサイズと難易度を合わせる
+        this.currentDifficulty = boardData.difficulty || 'easy';
+        const difficultySelect = document.getElementById('difficulty-select');
+        if (difficultySelect) {
+            difficultySelect.value = this.currentDifficulty;
+        }
+        
+        // ボード初期化
+        this.initBoard(boardData.rows, boardData.cols, boardData.mines.length);
+        
+        // エディター用地雷配置を設定
+        this.editorMines.clear();
+        console.log('Setting editor mines from boardData.mines:', boardData.mines);
+        
+        boardData.mines.forEach(([row, col]) => {
+            const key = `${row},${col}`;
+            this.editorMines.add(key);
+            console.log('Added mine at:', key);
+        });
+        
+        // エディター用開いた状態を設定
+        this.editorRevealed.clear();
+        if (boardData.revealedCells && boardData.revealedCells.length > 0) {
+            console.log('Setting editor revealed cells from boardData.revealedCells:', boardData.revealedCells);
+            
+            boardData.revealedCells.forEach(([row, col]) => {
+                const key = `${row},${col}`;
+                this.editorRevealed.add(key);
+                console.log('Added revealed cell at:', key);
+            });
+        }
+        
+        console.log('Editor mines after setup:', Array.from(this.editorMines));
+        console.log('Editor revealed cells after setup:', Array.from(this.editorRevealed));
+        
+        // 盤面名を設定
+        const nameInput = document.getElementById('board-name-input');
+        if (nameInput) {
+            nameInput.value = boardData.name;
+        }
+        
+        // エディターモードに入る
+        this.enterEditorMode();
+    }
+    
+    // インポート/エクスポート機能
+    exportCurrentBoard() {
+        const boardData = this.createBoardData('エクスポート盤面');
+        console.log('Exporting board data:', boardData);
+        
+        if (!boardData) {
+            alert('ゲームを開始してから盤面をエクスポートしてください');
+            return;
+        }
+        
+        const exportCode = this.encodeBoardData(boardData);
+        console.log('Generated export code:', exportCode);
+        
+        const exportArea = document.getElementById('export-code-area');
+        if (exportArea) {
+            exportArea.value = exportCode;
+        }
+    }
+    
+    encodeBoardData(boardData) {
+        // 軽量化されたデータをBase64エンコード
+        const compactData = {
+            n: boardData.name,
+            t: boardData.timestamp,
+            r: boardData.rows,
+            c: boardData.cols,
+            m: boardData.mines,
+            d: boardData.difficulty
+        };
+        
+        try {
+            const jsonString = JSON.stringify(compactData);
+            return 'MS-' + btoa(unescape(encodeURIComponent(jsonString)));
+        } catch (error) {
+            console.error('Export encoding error:', error);
+            return null;
+        }
+    }
+    
+    decodeBoardData(exportCode) {
+        try {
+            if (!exportCode.startsWith('MS-')) {
+                throw new Error('Invalid format');
+            }
+            
+            const base64Data = exportCode.substring(3);
+            const jsonString = decodeURIComponent(escape(atob(base64Data)));
+            const compactData = JSON.parse(jsonString);
+            
+            return {
+                name: compactData.n || 'インポート盤面',
+                timestamp: compactData.t || Date.now(),
+                rows: compactData.r,
+                cols: compactData.c,
+                mines: compactData.m,
+                difficulty: compactData.d || 'easy'
+            };
+        } catch (error) {
+            console.error('Import decoding error:', error);
+            return null;
+        }
+    }
+    
+    importBoard() {
+        const importArea = document.getElementById('import-code-area');
+        if (!importArea) return;
+        
+        const importCode = importArea.value.trim();
+        if (!importCode) {
+            alert('盤面コードを入力してください');
+            return;
+        }
+        
+        console.log('Importing code:', importCode);
+        
+        const boardData = this.decodeBoardData(importCode);
+        console.log('Decoded board data:', boardData);
+        
+        if (!boardData) {
+            alert('無効な盤面コードです');
+            return;
+        }
+        
+        // 盤面データの検証
+        if (!this.validateBoardData(boardData)) {
+            console.log('Validation failed for board data:', boardData);
+            alert('盤面データが無効です');
+            return;
+        }
+        
+        console.log('Board data validation passed');
+        
+        // インポートした盤面をエディターで編集できるように
+        const shouldEdit = confirm(`盤面「${boardData.name}」をインポートしました。\nエディターで編集しますか？`);
+        
+        if (shouldEdit) {
+            this.editBoard(boardData);
+        } else {
+            // 直接ゲームに適用
+            this.loadBoard(boardData);
+        }
+        
+        // インポートエリアをクリア
+        importArea.value = '';
+    }
+    
+    validateBoardData(boardData) {
+        // 基本的な検証
+        if (!boardData.rows || !boardData.cols || !boardData.mines) {
+            return false;
+        }
+        
+        // サイズの検証
+        if (boardData.rows < 3 || boardData.rows > 100 || 
+            boardData.cols < 3 || boardData.cols > 100) {
+            return false;
+        }
+        
+        // 地雷数の検証
+        const maxMines = boardData.rows * boardData.cols - 1;
+        if (boardData.mines.length > maxMines) {
+            return false;
+        }
+        
+        // 地雷位置の検証
+        for (const [row, col] of boardData.mines) {
+            if (row < 0 || row >= boardData.rows || 
+                col < 0 || col >= boardData.cols) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    copyExportCode() {
+        const exportArea = document.getElementById('export-code-area');
+        if (!exportArea || !exportArea.value) {
+            alert('エクスポートコードがありません');
+            return;
+        }
+        
+        exportArea.select();
+        exportArea.setSelectionRange(0, 99999); // モバイル対応
+        
+        try {
+            document.execCommand('copy');
+            alert('盤面コードをコピーしました');
+        } catch (error) {
+            // Fallback: navigator.clipboard APIを使用
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(exportArea.value).then(() => {
+                    alert('盤面コードをコピーしました');
+                }).catch(() => {
+                    alert('コピーに失敗しました。手動で選択してコピーしてください。');
+                });
+            } else {
+                alert('コピーに失敗しました。手動で選択してコピーしてください。');
+            }
+        }
+    }
+    
+    // 既存のrenderBoardメソッドをオーバーライドしてエディターモード対応
+    renderBoard() {
+        if (this.isEditorMode) {
+            this.renderEditorBoard();
+            return;
+        }
+        
+        // PCMinesweeperのrenderBoardを呼び出し
+        const boardElement = document.getElementById('game-board');
+        if (boardElement) {
+            boardElement.innerHTML = '';
+            boardElement.style.gridTemplateColumns = `repeat(${this.cols}, 1fr)`;
+            boardElement.classList.remove('editor-mode');
+            
+            // ボード要素で右クリックメニューを無効化
+            boardElement.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+            
+            for (let row = 0; row < this.rows; row++) {
+                for (let col = 0; col < this.cols; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    this.setupCellEventListeners(cell, row, col);
+                    
+                    boardElement.appendChild(cell);
+                }
+            }
+            
+            // 全セルがDOMに追加された後にupdateCellを呼ぶ
+            for (let row = 0; row < this.rows; row++) {
+                for (let col = 0; col < this.cols; col++) {
+                    this.updateCell(row, col);
+                }
+            }
+            
+            // 現在のズームレベルとフォントサイズを適用
+            this.updateZoom();
+            this.updateFontSize();
         }
     }
 }

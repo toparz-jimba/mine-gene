@@ -19,6 +19,534 @@
     --pro-bg: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
 }
 
+/* 盤面管理モーダル */
+.board-manager-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.board-manager-modal.show {
+    display: block;
+    opacity: 1;
+}
+
+.board-manager-modal-content {
+    background-color: var(--modal-content-bg);
+    margin: 2% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.board-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: var(--pro-bg);
+    color: white;
+    border-bottom: 1px solid #ddd;
+}
+
+.board-manager-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.board-manager-tabs {
+    display: flex;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ddd;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 15px 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.tab-btn.active {
+    background-color: white;
+    color: var(--text-primary);
+    border-bottom: 3px solid var(--pro-accent);
+}
+
+.tab-content {
+    display: none;
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 保存済み盤面タブ */
+.saved-boards-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.board-action-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.board-action-btn.primary {
+    background: var(--pro-accent);
+    color: #333;
+}
+
+.board-action-btn.secondary {
+    background: #e0e0e0;
+    color: var(--text-primary);
+}
+
+.board-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.search-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    min-width: 200px;
+}
+
+.saved-boards-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.board-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.board-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.board-name {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.board-details {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.board-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.board-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.board-btn.primary {
+    background: #007bff;
+    color: white;
+}
+
+.board-btn.secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.board-btn.danger {
+    background: #dc3545;
+    color: white;
+}
+
+.board-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* エディタータブ */
+.editor-header {
+    margin-bottom: 20px;
+}
+
+.editor-info {
+    margin-bottom: 15px;
+}
+
+.board-name-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.editor-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.editor-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.editor-mode-selector {
+    display: flex;
+    gap: 5px;
+    margin-right: 15px;
+}
+
+.editor-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.editor-btn.primary {
+    background: var(--pro-accent);
+    color: #333;
+}
+
+.editor-btn.secondary {
+    background: #e0e0e0;
+    color: var(--text-primary);
+}
+
+.editor-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.editor-instructions {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-left: 4px solid var(--pro-accent);
+    border-radius: 0 6px 6px 0;
+}
+
+.editor-instructions p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* エディターモード用セルスタイル */
+.game-board.editor-mode {
+    border: 2px solid var(--pro-accent);
+}
+
+.editor-cell {
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.editor-cell:hover {
+    background-color: #f0f0f0;
+    transform: scale(1.05);
+}
+
+.editor-cell.editor-mine {
+    background-color: #ffebee;
+    border-color: #f44336;
+}
+
+.editor-cell.editor-revealed {
+    background-color: #e8f5e8;
+    border-color: #4caf50;
+}
+
+/* インポート/エクスポートタブ */
+.import-export-section {
+    margin-bottom: 30px;
+}
+
+.import-export-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--pro-accent);
+    padding-bottom: 5px;
+}
+
+.export-controls, .import-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.code-area {
+    width: 100%;
+    height: 120px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    resize: vertical;
+    background: #f8f9fa;
+}
+
+.code-area:focus {
+    border-color: var(--pro-accent);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+}
+
+.copy-btn {
+    align-self: flex-start;
+    padding: 8px 16px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .board-manager-modal-content {
+        width: 95%;
+        margin: 5% auto;
+        max-height: 85vh;
+    }
+    
+    .saved-boards-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-input {
+        min-width: auto;
+    }
+    
+    .board-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .board-item-actions {
+        justify-content: center;
+    }
+    
+    .editor-controls {
+        justify-content: center;
+    }
+    
+    .export-controls, .import-controls {
+        align-items: stretch;
+    }
+    
+    .copy-btn {
+        align-self: stretch;
+    }
+}
+
+/* ダークテーマ用の盤面管理スタイル */
+[data-theme="dark"] .board-manager-modal-content {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .board-manager-tabs {
+    background-color: #3a3a3a;
+    border-bottom: 1px solid #4a4a4a;
+}
+
+[data-theme="dark"] .tab-btn {
+    color: #b0b0b0;
+}
+
+[data-theme="dark"] .tab-btn:hover {
+    background-color: #4a4a4a;
+}
+
+[data-theme="dark"] .tab-btn.active {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .tab-content {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .board-action-btn.secondary {
+    background: #4a4a4a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .board-action-btn.secondary:hover {
+    background: #5a5a5a;
+}
+
+[data-theme="dark"] .search-input {
+    background: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #5a5a5a;
+}
+
+[data-theme="dark"] .search-input::placeholder {
+    color: #888;
+}
+
+[data-theme="dark"] .board-item {
+    background: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .board-item:hover {
+    background: #404040;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .board-name {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .board-details {
+    color: #b0b0b0;
+}
+
+[data-theme="dark"] .empty-state {
+    color: #888;
+}
+
+[data-theme="dark"] .board-name-input {
+    background: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #5a5a5a;
+}
+
+[data-theme="dark"] .board-name-input::placeholder {
+    color: #888;
+}
+
+[data-theme="dark"] .editor-stats {
+    color: #b0b0b0;
+}
+
+[data-theme="dark"] .editor-btn.secondary {
+    background: #4a4a4a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .editor-btn.secondary:hover {
+    background: #5a5a5a;
+}
+
+[data-theme="dark"] .editor-instructions {
+    background: #333;
+    border-left: 4px solid var(--pro-accent);
+}
+
+[data-theme="dark"] .editor-instructions p {
+    color: #b0b0b0;
+}
+
+[data-theme="dark"] .editor-cell:hover {
+    background-color: #4a4a4a;
+}
+
+[data-theme="dark"] .editor-cell.editor-mine {
+    background-color: #4a2a2a;
+    border-color: #ff6b6b;
+}
+
+[data-theme="dark"] .import-export-section h3 {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .code-area {
+    background: #333;
+    color: #e0e0e0;
+    border: 1px solid #5a5a5a;
+}
+
+[data-theme="dark"] .code-area::placeholder {
+    color: #888;
+}
+
+[data-theme="dark"] .code-area:focus {
+    border-color: var(--pro-accent);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.3);
+}
+
 /* SVGアイコンのスタイリング */
 svg.w-3 { width: 0.75rem; height: 0.75rem; }
 svg.w-4 { width: 1rem; height: 1rem; }

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>マインスイーパー PC PRO版</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/heroicons@2.0.18/24/outline/index.js" type="module"></script>
 </head>
 <body>
     <div id="flag-animation-container"></div>
@@ -57,6 +56,9 @@
                 </button>
                 <button id="assist-btn" class="control-btn" title="補助モード">
                     <span><svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m6-6h-6m-6 0h6"/></svg>補助</span>
+                </button>
+                <button id="board-manager-btn" class="control-btn" title="盤面管理">
+                    <span><svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>盤面</span>
                 </button>
             </div>
         </div>
@@ -203,7 +205,76 @@
     </div>
     
     <!-- PRO版専用モーダル -->
-    
+    <!-- 盤面管理モーダル -->
+    <div class="board-manager-modal" id="board-manager-modal">
+        <div class="board-manager-modal-content">
+            <div class="board-manager-header">
+                <h2 id="board-manager-title">盤面管理</h2>
+                <button id="close-board-manager" class="close-btn"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="board-manager-tabs">
+                <button id="saved-boards-tab" class="tab-btn active">保存済み盤面</button>
+                <button id="board-editor-tab" class="tab-btn">エディター</button>
+                <button id="import-export-tab" class="tab-btn">インポート/エクスポート</button>
+            </div>
+            
+            <!-- 保存済み盤面タブ -->
+            <div id="saved-boards-content" class="tab-content active">
+                <div class="saved-boards-header">
+                    <button id="save-current-board" class="board-action-btn primary">現在の盤面を保存</button>
+                    <div class="board-search">
+                        <input type="text" id="board-search-input" placeholder="盤面名で検索..." class="search-input">
+                    </div>
+                </div>
+                <div id="saved-boards-list" class="saved-boards-list">
+                    <div class="empty-state">保存された盤面がありません</div>
+                </div>
+            </div>
+            
+            <!-- エディタータブ -->
+            <div id="board-editor-content" class="tab-content">
+                <div class="editor-header">
+                    <div class="editor-info">
+                        <input type="text" id="board-name-input" placeholder="盤面名を入力..." class="board-name-input">
+                        <div class="editor-stats">
+                            <span>地雷数: <span id="mine-count-display">0</span></span>
+                            <span>サイズ: <span id="board-size-display">9×9</span></span>
+                        </div>
+                    </div>
+                    <div class="editor-controls">
+                        <div class="editor-mode-selector">
+                            <button id="mine-mode-btn" class="editor-btn primary">地雷配置</button>
+                            <button id="reveal-mode-btn" class="editor-btn secondary">開く設定</button>
+                        </div>
+                        <button id="save-edited-board" class="editor-btn primary">保存</button>
+                        <button id="test-board-btn" class="editor-btn primary">テストプレイ</button>
+                    </div>
+                </div>
+                <div class="editor-instructions">
+                    <p>クリックで地雷を配置/削除できます。右クリックで連続配置モードを切り替えできます。</p>
+                </div>
+            </div>
+            
+            <!-- インポート/エクスポートタブ -->
+            <div id="import-export-content" class="tab-content">
+                <div class="import-export-section">
+                    <h3>エクスポート</h3>
+                    <div class="export-controls">
+                        <button id="export-current-btn" class="board-action-btn secondary">現在の盤面をコード化</button>
+                        <textarea id="export-code-area" class="code-area" readonly placeholder="盤面コードがここに表示されます"></textarea>
+                        <button id="copy-export-btn" class="copy-btn">コピー</button>
+                    </div>
+                </div>
+                <div class="import-export-section">
+                    <h3>インポート</h3>
+                    <div class="import-controls">
+                        <textarea id="import-code-area" class="code-area" placeholder="盤面コードを貼り付けてください"></textarea>
+                        <button id="import-board-btn" class="board-action-btn primary">盤面を読み込み</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- スピードラン完了モーダル -->
     <div id="speedrun-complete-modal" class="modal">
