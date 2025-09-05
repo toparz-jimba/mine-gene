@@ -2096,7 +2096,7 @@ this.savedEditorMines = new Set(this.editorMines);
     copyExportCode() {
         const exportArea = document.getElementById('export-code-area');
         if (!exportArea || !exportArea.value) {
-            alert('エクスポートコードがありません');
+            this.showMessage('エクスポートコードがありません', 2000, 'error');
             return;
         }
         
@@ -2105,17 +2105,17 @@ this.savedEditorMines = new Set(this.editorMines);
         
         try {
             document.execCommand('copy');
-            alert('盤面コードをコピーしました');
+            this.showMessage('盤面コードをコピーしました', 2000, 'success');
         } catch (error) {
             // Fallback: navigator.clipboard APIを使用
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(exportArea.value).then(() => {
-                    alert('盤面コードをコピーしました');
+                    this.showMessage('盤面コードをコピーしました', 2000, 'success');
                 }).catch(() => {
-                    alert('コピーに失敗しました。手動で選択してコピーしてください。');
+                    this.showMessage('コピーに失敗しました。手動で選択してコピーしてください。', 3000, 'error');
                 });
             } else {
-                alert('コピーに失敗しました。手動で選択してコピーしてください。');
+                this.showMessage('コピーに失敗しました。手動で選択してコピーしてください。', 3000, 'error');
             }
         }
     }
