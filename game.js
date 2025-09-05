@@ -131,8 +131,70 @@ class PCProMinesweeper extends PCMinesweeper {
         }
     }
     
+    // インポート盤面用タイマー開始処理
+    startTimerIfNeeded(actionType = 'click') {
+        if ((this.isImportedBoard || this.needsTimerStart) && this.timer === 0 && !this.timerInterval) {
+            console.log(`[DEBUG] Starting timer for imported board (${actionType})`);
+            this.startTimer();
+            this.needsTimerStart = false;
+        }
+    }
+    
+    // フェードアウトメッセージ表示
+    showMessage(text, duration = 3000, type = 'info') {
+        // 既存のメッセージがあれば削除
+        const existingMessage = document.querySelector('.fade-message');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        
+        // メッセージ要素を作成
+        const messageElement = document.createElement('div');
+        messageElement.className = `fade-message fade-message-${type}`;
+        messageElement.textContent = text;
+        
+        // スタイルを設定
+        Object.assign(messageElement.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            zIndex: '10000',
+            opacity: '0',
+            transition: 'opacity 0.3s ease-in-out',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+        });
+        
+        // DOMに追加
+        document.body.appendChild(messageElement);
+        
+        // フェードイン
+        setTimeout(() => {
+            messageElement.style.opacity = '1';
+        }, 10);
+        
+        // フェードアウト
+        setTimeout(() => {
+            messageElement.style.opacity = '0';
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.remove();
+                }
+            }, 300);
+        }, duration);
+    }
+    
     // オーバーライドメソッド
     revealCell(row, col) {
+        // インポートした盤面の場合、最初のクリックでタイマーを開始
+        this.startTimerIfNeeded('reveal');
+        
         const wasRevealed = this.revealed[row][col];
         super.revealCell(row, col);
         
@@ -150,6 +212,9 @@ class PCProMinesweeper extends PCMinesweeper {
     }
     
     toggleFlag(row, col) {
+        // インポートした盤面の場合、最初の操作でタイマーを開始
+        this.startTimerIfNeeded('flag');
+        
         const wasFlagged = this.flagged[row][col];
         super.toggleFlag(row, col);
         
@@ -184,6 +249,8 @@ class PCProMinesweeper extends PCMinesweeper {
         const assistModeState = this.assistMode;
         
         // リセット
+        this.isImportedBoard = false; // インポートした盤面フラグをリセット
+        this.needsTimerStart = false; // タイマー開始フラグをリセット
         
         // 確率表示をクリア
         this.clearProbabilityDisplay();
@@ -1198,7 +1265,7 @@ class PCProMinesweeper extends PCMinesweeper {
         this.saveBoardToStorage(boardData);
         this.loadSavedBoards();
         
-        alert('盤面を保存しました: ' + name);
+        this.showMessage(`盤面「${name}」を保存しました`, 2000, 'success');
     }
     
     saveBoardToStorage(boardData) {
@@ -1346,7 +1413,8 @@ class PCProMinesweeper extends PCMinesweeper {
         this.gameOver = false;
         this.gameWon = false;
         this.timer = 0;
-        this.firstClick = false; // 地雷は既に配置済み
+        this.firstClick = false; // 地雷は既に配置済みなので再配置を防ぐ
+        this.isImportedBoard = true; // インポートした盤面フラグ
         
         // 地雷数と設定を更新
         this.mineCount = boardData.mines.length;
@@ -1355,10 +1423,21 @@ class PCProMinesweeper extends PCMinesweeper {
         // タイマーを停止
         this.stopTimer();
         
+        // インポート盤面用フラグ設定
+        this.needsTimerStart = true; // 最初のクリックでタイマー開始フラグ
+        
         // UI更新
         this.renderBoard();
         this.updateMineCount();
         this.updateTimer();
+        
+        // 既に開いているセルがある場合は、即座にタイマー開始
+        const hasRevealedCells = this.revealed.some(row => row.some(cell => cell));
+        if (hasRevealedCells) {
+            console.log('[DEBUG] Board has revealed cells, starting timer immediately');
+            this.startTimer();
+            this.needsTimerStart = false;
+        }
         
         // 確率・補助表示をクリア
         if (this.probabilityMode) {
@@ -1371,7 +1450,7 @@ class PCProMinesweeper extends PCMinesweeper {
         // モーダルを閉じる
         this.closeBoardManager();
         
-        alert(`盤面「${boardData.name}」を読み込みました`);
+        this.showMessage(`盤面「${boardData.name}」を読み込みました`, 2000, 'success');
     }
     
     calculateNumbers() {
@@ -1405,7 +1484,7 @@ class PCProMinesweeper extends PCMinesweeper {
         localStorage.setItem('minesweeper-saved-boards', JSON.stringify(filteredBoards));
         this.loadSavedBoards();
         
-        alert(`盤面「${boardData.name}」を削除しました`);
+        this.showMessage(`盤面「${boardData.name}」を削除しました`, 2000, 'success');
     }
     
     filterSavedBoards(searchTerm) {
@@ -1732,19 +1811,19 @@ this.savedEditorMines = new Set(this.editorMines);
         const name = nameInput ? nameInput.value.trim() : '';
         
         if (!name) {
-            alert('盤面名を入力してください');
+            this.showMessage('盤面名を入力してください', 2000, 'error');
             return;
         }
         
         if (this.editorMines.size === 0) {
-            alert('地雷を配置してください');
+            this.showMessage('地雷を配置してください', 2000, 'error');
             return;
         }
         
         const boardData = this.createBoardData(name);
         this.saveBoardToStorage(boardData);
         
-        alert(`盤面「${name}」を保存しました`);
+        this.showMessage(`盤面「${name}」を保存しました`, 2000, 'success');
         
         // 盤面名をクリア
         if (nameInput) {
@@ -1757,7 +1836,7 @@ this.savedEditorMines = new Set(this.editorMines);
     
     testBoard() {
         if (this.editorMines.size === 0) {
-            alert('地雷を配置してください');
+            this.showMessage('地雷を配置してください', 2000, 'error');
             return;
         }
         
@@ -1929,7 +2008,7 @@ this.savedEditorMines = new Set(this.editorMines);
         
         const importCode = importArea.value.trim();
         if (!importCode) {
-            alert('盤面コードを入力してください');
+            this.showMessage('盤面コードを入力してください', 2000, 'error');
             return;
         }
         
@@ -1939,21 +2018,27 @@ this.savedEditorMines = new Set(this.editorMines);
         console.log('Decoded board data:', boardData);
         
         if (!boardData) {
-            alert('無効な盤面コードです');
+            this.showMessage('無効な盤面コードです', 3000, 'error');
             return;
         }
         
         // 盤面データの検証
         if (!this.validateBoardData(boardData)) {
             console.log('Validation failed for board data:', boardData);
-            alert('盤面データが無効です');
+            this.showMessage('盤面データが無効です', 3000, 'error');
             return;
         }
         
         console.log('Board data validation passed');
         
-        // インポートした盤面をエディターで表示
-        this.editBoard(boardData);
+        // インポートした盤面を直接テストプレイで開始
+        this.exitEditorMode(); // エディターモードの場合は終了
+        this.loadBoard(boardData);
+        this.closeBoardManager(); // ボード管理モーダルを閉じる
+        
+        // 成功メッセージを表示
+        const boardName = boardData.name || '盤面';
+        this.showMessage(`${boardName}を読み込みました`, 2000, 'success');
         
         // インポートエリアをクリア
         importArea.value = '';
