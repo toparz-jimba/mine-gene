@@ -27,6 +27,9 @@ class PCProMinesweeper extends PCMinesweeper {
         this.editorMode = 'mine'; // 'mine' または 'reveal'
         this.savedGameState = null; // メインゲームの状態を保存
         
+        // リトライ機能用
+        this.originalBoardData = null; // 読み込んだ盤面の初期データ
+        
         this.initPro();
     }
     
@@ -67,6 +70,12 @@ class PCProMinesweeper extends PCMinesweeper {
         const boardManagerBtn = document.getElementById('board-manager-btn');
         if (boardManagerBtn) {
             boardManagerBtn.addEventListener('click', () => this.openBoardManager());
+        }
+        
+        // リトライボタン
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.retryBoard());
         }
         
         // キーボードショートカット
@@ -234,6 +243,11 @@ class PCProMinesweeper extends PCMinesweeper {
     onGameOver() {
         super.onGameOver();
         if (this.soundEnabled) this.playSound('lose');
+        
+        // 読み込んだ盤面の場合はリトライボタンを表示
+        if (this.originalBoardData) {
+            this.showRetryButton();
+        }
     }
     
     onGameWon() {
@@ -251,6 +265,7 @@ class PCProMinesweeper extends PCMinesweeper {
         // リセット
         this.isImportedBoard = false; // インポートした盤面フラグをリセット
         this.needsTimerStart = false; // タイマー開始フラグをリセット
+        this.originalBoardData = null; // 読み込んだ盤面データをクリア
         
         // 確率表示をクリア
         this.clearProbabilityDisplay();
@@ -264,6 +279,8 @@ class PCProMinesweeper extends PCMinesweeper {
             console.log('[DEBUG] Cleared persistent probabilities on game reset');
         }
         
+        // リトライボタンを非表示
+        this.hideRetryButton();
         
         // 基本的なnewGame処理
         super.newGame();
@@ -1426,6 +1443,9 @@ class PCProMinesweeper extends PCMinesweeper {
         // インポート盤面用フラグ設定
         this.needsTimerStart = true; // 最初のクリックでタイマー開始フラグ
         
+        // リトライ用に盤面データを保存
+        this.originalBoardData = JSON.parse(JSON.stringify(boardData));
+        
         // UI更新
         this.renderBoard();
         this.updateMineCount();
@@ -2098,6 +2118,38 @@ this.savedEditorMines = new Set(this.editorMines);
                 alert('コピーに失敗しました。手動で選択してコピーしてください。');
             }
         }
+    }
+    
+    // リトライ機能
+    showRetryButton() {
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) {
+            retryBtn.style.display = 'block';
+        }
+    }
+    
+    hideRetryButton() {
+        const retryBtn = document.getElementById('retry-btn');
+        if (retryBtn) {
+            retryBtn.style.display = 'none';
+        }
+    }
+    
+    retryBoard() {
+        if (!this.originalBoardData) {
+            console.log('[DEBUG] No original board data for retry');
+            return;
+        }
+        
+        console.log('[DEBUG] Retrying board:', this.originalBoardData.name);
+        
+        // 同じ盤面を再読み込み
+        this.loadBoard(this.originalBoardData);
+        
+        // リトライボタンを非表示
+        this.hideRetryButton();
+        
+        this.showMessage('盤面をリトライしました', 2000, 'info');
     }
     
     // 既存のrenderBoardメソッドをオーバーライドしてエディターモード対応

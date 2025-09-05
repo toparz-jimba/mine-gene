@@ -741,6 +741,35 @@ body {
     box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
 }
 
+.retry-btn {
+    min-width: 80px;
+    height: 40px;
+    border: none;
+    background: linear-gradient(145deg, #ffeb3b, #ff9800);
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 8px 16px;
+    text-align: center;
+    color: #333;
+    margin-left: 10px;
+}
+
+.retry-btn:hover {
+    background: linear-gradient(145deg, #fff176, #ffb74d);
+}
+
+.retry-btn:active {
+    transform: scale(0.95);
+    box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.5);
+}
+
 
 .difficulty-select-modal {
     width: 100%;
