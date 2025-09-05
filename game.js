@@ -21,6 +21,8 @@ class PCProMinesweeper extends PCMinesweeper {
         this.isEditingFromSavedBoard = false; // 保存済み盤面からの編集かどうか
         this.editorMines = new Set(); // エディター用地雷配置 "row,col"形式
         this.editorRevealed = new Set(); // エディター用開いた状態のマス "row,col"形式
+        this.savedEditorMines = new Set(); // タブ切り替え時に保持する地雷情報
+        this.savedEditorRevealed = new Set(); // タブ切り替え時に保持する開く設定情報
         this.continuousPlacement = false; // 連続配置モード
         this.editorMode = 'mine'; // 'mine' または 'reveal'
         this.savedGameState = null; // メインゲームの状態を保存
@@ -1151,6 +1153,8 @@ class PCProMinesweeper extends PCMinesweeper {
         
         // 開いた状態の情報を抽出
         const revealedCells = [];
+        console.log('createBoardData: isEditorMode =', this.isEditorMode);
+        console.log('createBoardData: editorRevealed =', Array.from(this.editorRevealed));
         if (this.isEditorMode) {
             // エディターモードでは editorRevealed を使用
             this.editorRevealed.forEach(cellPos => {
@@ -1158,6 +1162,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 revealedCells.push([row, col]);
             });
         }
+        console.log('createBoardData: final revealedCells =', revealedCells);
         
         const boardData = {
             name: name,
@@ -1271,7 +1276,7 @@ class PCProMinesweeper extends PCMinesweeper {
         
         // イベントリスナー追加
         item.querySelector('[data-action="load"]').addEventListener('click', () => {
-            this.loadBoard(boardData);
+            this.editBoard(boardData);
         });
         
         item.querySelector('[data-action="edit"]').addEventListener('click', () => {
@@ -1326,11 +1331,16 @@ class PCProMinesweeper extends PCMinesweeper {
         
         // 保存された開いた状態を適用
         if (boardData.revealedCells && boardData.revealedCells.length > 0) {
+            console.log('loadBoard: applying revealedCells =', boardData.revealedCells);
             boardData.revealedCells.forEach(([row, col]) => {
                 if (row < boardData.rows && col < boardData.cols) {
                     this.revealed[row][col] = true;
+                    console.log(`loadBoard: set revealed[${row}][${col}] = true`);
                 }
             });
+            console.log('loadBoard: revealed array after applying =', this.revealed);
+        } else {
+            console.log('loadBoard: no revealedCells to apply');
         }
         
         this.gameOver = false;
@@ -1463,7 +1473,15 @@ class PCProMinesweeper extends PCMinesweeper {
         // 現在のゲーム状態を保存
         this.saveCurrentGameState();
         
-        // 現在の盤面の地雷配置をエディター用にコピー（editBoardから呼ばれた場合はスキップ）
+        // 保存されたエディター情報を復元
+        if (this.savedEditorMines.size > 0) {
+            this.editorMines = new Set(this.savedEditorMines);
+        }
+        if (this.savedEditorRevealed.size > 0) {
+            this.editorRevealed = new Set(this.savedEditorRevealed);
+        }
+        
+        // 現在の盤面の地雷配置をエディター用にコピー（editBoardから呼ばれた場合や保存情報がある場合はスキップ）
         if (this.editorMines.size === 0) {
             console.log('Copying mines from current board to editor');
             for (let row = 0; row < this.rows; row++) {
@@ -1542,6 +1560,10 @@ class PCProMinesweeper extends PCMinesweeper {
     }
     
     exitEditorMode() {
+        // エディター情報を保存（タブ切り替え時に失われないように）
+this.savedEditorMines = new Set(this.editorMines);
+        this.savedEditorRevealed = new Set(this.editorRevealed);
+        
         this.isEditorMode = false;
         
         // 保存済み盤面編集フラグをリセット
@@ -1632,6 +1654,10 @@ class PCProMinesweeper extends PCMinesweeper {
             }
         }
         
+        // エディター情報を常時保存
+        this.savedEditorMines = new Set(this.editorMines);
+        this.savedEditorRevealed = new Set(this.editorRevealed);
+        
         // セル表示を更新
         const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
         if (cell) {
@@ -1655,6 +1681,10 @@ class PCProMinesweeper extends PCMinesweeper {
         } else {
             this.editorRevealed.add(key);
         }
+        
+        // エディター情報を常時保存
+        this.savedEditorMines = new Set(this.editorMines);
+        this.savedEditorRevealed = new Set(this.editorRevealed);
         
         // セル表示を更新
         const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
@@ -1734,6 +1764,8 @@ class PCProMinesweeper extends PCMinesweeper {
         // エディターの盤面をテスト用に適用
         const boardData = this.createBoardData('テスト盤面');
         
+        console.log('testBoard: boardData =', boardData);
+        console.log('testBoard: revealedCells =', boardData.revealedCells);
         
         // ゲームモードに戻す
         this.exitEditorMode();
@@ -1774,17 +1806,23 @@ class PCProMinesweeper extends PCMinesweeper {
         // エディター用開いた状態を設定
         this.editorRevealed.clear();
         if (boardData.revealedCells && boardData.revealedCells.length > 0) {
-            console.log('Setting editor revealed cells from boardData.revealedCells:', boardData.revealedCells);
+            console.log('editBoard: Setting editor revealed cells from boardData.revealedCells:', boardData.revealedCells);
             
             boardData.revealedCells.forEach(([row, col]) => {
                 const key = `${row},${col}`;
                 this.editorRevealed.add(key);
-                console.log('Added revealed cell at:', key);
+                console.log('editBoard: Added revealed cell at:', key);
             });
+        } else {
+            console.log('editBoard: No revealedCells in boardData');
         }
         
         console.log('Editor mines after setup:', Array.from(this.editorMines));
         console.log('Editor revealed cells after setup:', Array.from(this.editorRevealed));
+        
+        // エディター情報を保存（常時保存）
+        this.savedEditorMines = new Set(this.editorMines);
+        this.savedEditorRevealed = new Set(this.editorRevealed);
         
         // 盤面名を設定
         const nameInput = document.getElementById('board-name-input');
@@ -1798,8 +1836,32 @@ class PCProMinesweeper extends PCMinesweeper {
     
     // インポート/エクスポート機能
     exportCurrentBoard() {
-        const boardData = this.createBoardData('エクスポート盤面');
-        console.log('Exporting board data:', boardData);
+        // エディター情報を保持しているかチェック（現在の情報 + 保存された情報）
+        const hasCurrentEditorData = this.editorMines && this.editorMines.size > 0;
+        const hasSavedEditorData = this.savedEditorMines && this.savedEditorMines.size > 0;
+        
+        
+        let boardData;
+        if (hasCurrentEditorData || hasSavedEditorData) {
+            // エディター情報がある場合は、一時的にエディターモードとして扱う
+            const wasEditorMode = this.isEditorMode;
+            this.isEditorMode = true;
+            
+            // 保存された情報を現在の情報に復元
+            if (hasSavedEditorData && !hasCurrentEditorData) {
+                this.editorMines = new Set(this.savedEditorMines);
+                this.editorRevealed = new Set(this.savedEditorRevealed);
+            }
+            
+            boardData = this.createBoardData('エクスポート盤面');
+            
+            // 元の状態に戻す
+            this.isEditorMode = wasEditorMode;
+        } else {
+            // エディター情報がない場合は通常通り
+            boardData = this.createBoardData('エクスポート盤面');
+        }
+        
         
         if (!boardData) {
             alert('ゲームを開始してから盤面をエクスポートしてください');
@@ -1823,6 +1885,7 @@ class PCProMinesweeper extends PCMinesweeper {
             r: boardData.rows,
             c: boardData.cols,
             m: boardData.mines,
+            rv: boardData.revealedCells || [],
             d: boardData.difficulty
         };
         
@@ -1851,6 +1914,7 @@ class PCProMinesweeper extends PCMinesweeper {
                 rows: compactData.r,
                 cols: compactData.c,
                 mines: compactData.m,
+                revealedCells: compactData.rv || [],
                 difficulty: compactData.d || 'easy'
             };
         } catch (error) {
@@ -1888,15 +1952,8 @@ class PCProMinesweeper extends PCMinesweeper {
         
         console.log('Board data validation passed');
         
-        // インポートした盤面をエディターで編集できるように
-        const shouldEdit = confirm(`盤面「${boardData.name}」をインポートしました。\nエディターで編集しますか？`);
-        
-        if (shouldEdit) {
-            this.editBoard(boardData);
-        } else {
-            // 直接ゲームに適用
-            this.loadBoard(boardData);
-        }
+        // インポートした盤面をエディターで表示
+        this.editBoard(boardData);
         
         // インポートエリアをクリア
         importArea.value = '';
