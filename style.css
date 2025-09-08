@@ -1845,3 +1845,334 @@ body.power-save-mode .control-btn.active {
     color: var(--text-primary);
 }
 
+/* 時間制限モードモーダル */
+.time-attack-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--modal-bg);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.time-attack-modal.show {
+    display: block;
+    opacity: 1;
+}
+
+.time-attack-modal-content {
+    background-color: var(--modal-content-bg);
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.time-attack-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+}
+
+.time-attack-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.time-attack-content {
+    display: none;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.time-attack-content.active {
+    display: block;
+}
+
+/* 設定画面スタイル */
+.time-attack-setup-section {
+    margin-bottom: 25px;
+}
+
+.time-attack-setup-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    color: var(--text-primary);
+}
+
+.time-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.time-input {
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 18px;
+    width: 80px;
+    text-align: center;
+    background: var(--container-bg);
+    color: var(--text-primary);
+    transition: border-color 0.3s ease;
+}
+
+.time-input:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+.time-unit {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.difficulty-select {
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--container-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.3s ease;
+}
+
+.difficulty-select:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+.record-display {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+    border: 2px dashed #ddd;
+}
+
+.record-display span {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.time-attack-actions {
+    margin-top: 30px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* ゲーム中画面スタイル */
+.time-attack-game-info {
+    margin-bottom: 30px;
+}
+
+.time-attack-timer-display,
+.time-attack-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.time-remaining-label,
+.boards-cleared-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.time-remaining {
+    font-size: 28px;
+    font-weight: bold;
+    color: #4caf50;
+    font-family: monospace;
+}
+
+.boards-cleared {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2196f3;
+}
+
+.time-attack-game-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* 結果画面スタイル */
+.time-attack-result-header h3 {
+    margin: 0 0 20px 0;
+    text-align: center;
+    font-size: 1.3em;
+    color: var(--text-primary);
+}
+
+.time-attack-result-stats {
+    margin-bottom: 30px;
+}
+
+.result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.result-item.new-record {
+    background: linear-gradient(135deg, #ffd700, #ffed4a);
+    animation: newRecordGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes newRecordGlow {
+    0% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+    100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+}
+
+.result-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.result-value {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.time-attack-result-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+/* ボタンスタイル */
+.time-attack-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 100px;
+}
+
+.time-attack-btn.primary {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+}
+
+.time-attack-btn.primary:hover {
+    background: linear-gradient(135deg, #ee5a24, #d63031);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(238, 90, 36, 0.3);
+}
+
+.time-attack-btn.secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.time-attack-btn.secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+.time-attack-btn.danger {
+    background: #dc3545;
+    color: white;
+}
+
+.time-attack-btn.danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .time-attack-modal-content {
+        width: 95%;
+        margin: 2% auto;
+        max-height: 95vh;
+    }
+    
+    .time-attack-content {
+        padding: 20px;
+    }
+    
+    .time-attack-actions,
+    .time-attack-game-actions,
+    .time-attack-result-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .time-attack-btn {
+        width: 100%;
+    }
+    
+    .time-remaining {
+        font-size: 24px;
+    }
+    
+    .boards-cleared {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .time-attack-header {
+        padding: 15px;
+    }
+    
+    .time-attack-header h2 {
+        font-size: 1.2em;
+    }
+    
+    .time-attack-content {
+        padding: 15px;
+    }
+    
+    .time-input {
+        width: 70px;
+        font-size: 16px;
+    }
+    
+    .time-remaining {
+        font-size: 20px;
+    }
+    
+    .boards-cleared {
+        font-size: 18px;
+    }
+}
+

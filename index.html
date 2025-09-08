@@ -61,6 +61,9 @@
                 <button id="board-manager-btn" class="control-btn" title="盤面管理">
                     <span><svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>盤面</span>
                 </button>
+                <button id="time-attack-btn" class="control-btn" title="時間制限モード">
+                    <span><svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>時間制限</span>
+                </button>
             </div>
         </div>
 
@@ -281,6 +284,97 @@
     <div id="speedrun-complete-modal" class="modal">
         <div class="modal-content speedrun-modal-content">
             <div id="speedrun-content"></div>
+        </div>
+    </div>
+    
+    <!-- 時間制限モードモーダル -->
+    <div class="time-attack-modal" id="time-attack-modal">
+        <div class="time-attack-modal-content">
+            <div class="time-attack-header">
+                <h2 id="time-attack-title">時間制限モード</h2>
+                <button id="close-time-attack" class="close-btn"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            
+            <!-- ゲーム設定画面 -->
+            <div id="time-attack-setup" class="time-attack-content active">
+                <div class="time-attack-setup-section">
+                    <h3>制限時間設定</h3>
+                    <div class="time-input-group">
+                        <input type="number" id="time-limit-input" min="1" max="60" value="5" class="time-input">
+                        <span class="time-unit">分</span>
+                    </div>
+                </div>
+                
+                <div class="time-attack-setup-section">
+                    <h3>盤面サイズ</h3>
+                    <select id="time-attack-difficulty" class="difficulty-select">
+                        <option value="hiddeneasy" selected>裏初級 (9×9, 地雷20)</option>
+                        <option value="easy">初級 (9×9, 地雷10)</option>
+                        <option value="medium">中級 (16×16, 地雷40)</option>
+                        <option value="hard">上級 (16×30, 地雷99)</option>
+                    </select>
+                </div>
+                
+                <div class="time-attack-setup-section">
+                    <h3>最高記録</h3>
+                    <div id="time-attack-record" class="record-display">
+                        <span id="best-record-text">記録なし</span>
+                    </div>
+                </div>
+                
+                <div class="time-attack-actions">
+                    <button id="start-time-attack" class="time-attack-btn primary">開始</button>
+                    <button id="resume-time-attack" class="time-attack-btn secondary" style="display: none;">再開</button>
+                </div>
+            </div>
+            
+            <!-- ゲーム中画面 -->
+            <div id="time-attack-game" class="time-attack-content">
+                <div class="time-attack-game-info">
+                    <div class="time-attack-timer-display">
+                        <span class="time-remaining-label">残り時間:</span>
+                        <span id="time-attack-timer" class="time-remaining">05:00</span>
+                    </div>
+                    <div class="time-attack-progress">
+                        <span class="boards-cleared-label">クリア数:</span>
+                        <span id="boards-cleared" class="boards-cleared">0</span>
+                    </div>
+                </div>
+                
+                <div class="time-attack-game-actions">
+                    <button id="pause-time-attack" class="time-attack-btn secondary">一時停止</button>
+                    <button id="stop-time-attack" class="time-attack-btn danger">終了</button>
+                </div>
+            </div>
+            
+            <!-- 結果画面 -->
+            <div id="time-attack-result" class="time-attack-content">
+                <div class="time-attack-result-header">
+                    <h3>結果</h3>
+                </div>
+                <div class="time-attack-result-stats">
+                    <div class="result-item">
+                        <span class="result-label">制限時間:</span>
+                        <span id="result-time-limit" class="result-value"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">クリア数:</span>
+                        <span id="result-boards-cleared" class="result-value"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">平均タイム:</span>
+                        <span id="result-avg-time" class="result-value"></span>
+                    </div>
+                    <div class="result-item new-record" id="new-record-display" style="display: none;">
+                        <span class="result-label">🎉 新記録！</span>
+                    </div>
+                </div>
+                
+                <div class="time-attack-result-actions">
+                    <button id="restart-time-attack" class="time-attack-btn primary">再挑戦</button>
+                    <button id="back-to-setup" class="time-attack-btn secondary">設定に戻る</button>
+                </div>
+            </div>
         </div>
     </div>
     

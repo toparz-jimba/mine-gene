@@ -30,6 +30,18 @@ class PCProMinesweeper extends PCMinesweeper {
         // リトライ機能用
         this.originalBoardData = null; // 読み込んだ盤面の初期データ
         
+        // 時間制限モード用
+        this.timeAttackMode = false; // 時間制限モード中フラグ
+        this.timeAttackTimer = null; // 制限時間カウントダウンタイマー
+        this.timeAttackStartTime = null; // モード開始時刻
+        this.timeAttackDuration = 300; // 制限時間（秒）
+        this.timeAttackBoardsCleared = 0; // クリアした盤面数
+        this.timeAttackBoardStartTime = null; // 現在の盤面開始時刻
+        this.timeAttackBoardTimes = []; // 各盤面のクリア時間記録
+        this.timeAttackDifficulty = 'hiddeneasy'; // 時間制限モードの難易度
+        this.timeAttackPaused = false; // 一時停止状態
+        this.timeAttackPausedTime = 0; // 一時停止時間の累計
+        
         this.initPro();
     }
     
@@ -76,6 +88,12 @@ class PCProMinesweeper extends PCMinesweeper {
         const retryBtn = document.getElementById('retry-btn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => this.retryBoard());
+        }
+        
+        // 時間制限モードボタン
+        const timeAttackBtn = document.getElementById('time-attack-btn');
+        if (timeAttackBtn) {
+            timeAttackBtn.addEventListener('click', () => this.openTimeAttackModal());
         }
         
         // キーボードショートカット
@@ -251,6 +269,21 @@ class PCProMinesweeper extends PCMinesweeper {
     }
     
     onGameWon() {
+        // 時間制限モードの処理
+        if (this.timeAttackMode) {
+            const boardTime = (Date.now() - this.timeAttackBoardStartTime) / 1000;
+            this.timeAttackBoardTimes.push(boardTime);
+            this.timeAttackBoardsCleared++;
+            
+            this.updateTimeAttackDisplay();
+            
+            setTimeout(() => {
+                this.startNewTimeAttackBoard();
+            }, 500);
+            return;
+        }
+        
+        // 通常の処理
         super.onGameWon();
         if (this.soundEnabled) this.playSound('win');
         
@@ -2196,6 +2229,291 @@ this.savedEditorMines = new Set(this.editorMines);
             this.updateFontSize();
         }
     }
+    
+    // 時間制限モード関連メソッド
+    openTimeAttackModal() {
+        const modal = document.getElementById('time-attack-modal');
+        if (modal) {
+            modal.classList.add('show');
+            this.showTimeAttackScreen('setup');
+            this.updateTimeAttackRecord();
+        }
+        
+        this.setupTimeAttackEventListeners();
+    }
+    
+    closeTimeAttackModal() {
+        const modal = document.getElementById('time-attack-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        
+        this.cleanupTimeAttackEventListeners();
+    }
+    
+    setupTimeAttackEventListeners() {
+        if (this.timeAttackEventListenersSetup) return;
+        this.timeAttackEventListenersSetup = true;
+        
+        this.closeTimeAttackHandler = () => this.closeTimeAttackModal();
+        this.startTimeAttackHandler = () => this.startTimeAttack();
+        this.resumeTimeAttackHandler = () => this.resumeTimeAttack();
+        this.pauseTimeAttackHandler = () => this.pauseTimeAttack();
+        this.stopTimeAttackHandler = () => this.stopTimeAttack();
+        this.restartTimeAttackHandler = () => this.restartTimeAttack();
+        this.backToSetupHandler = () => this.showTimeAttackScreen('setup');
+        
+        this.timeAttackModalClickHandler = (e) => {
+            const modal = document.getElementById('time-attack-modal');
+            if (e.target === modal) {
+                this.closeTimeAttackModal();
+            }
+        };
+        
+        document.getElementById('close-time-attack')?.addEventListener('click', this.closeTimeAttackHandler);
+        document.getElementById('start-time-attack')?.addEventListener('click', this.startTimeAttackHandler);
+        document.getElementById('resume-time-attack')?.addEventListener('click', this.resumeTimeAttackHandler);
+        document.getElementById('pause-time-attack')?.addEventListener('click', this.pauseTimeAttackHandler);
+        document.getElementById('stop-time-attack')?.addEventListener('click', this.stopTimeAttackHandler);
+        document.getElementById('restart-time-attack')?.addEventListener('click', this.restartTimeAttackHandler);
+        document.getElementById('back-to-setup')?.addEventListener('click', this.backToSetupHandler);
+        document.getElementById('time-attack-modal')?.addEventListener('click', this.timeAttackModalClickHandler);
+    }
+    
+    cleanupTimeAttackEventListeners() {
+        if (!this.timeAttackEventListenersSetup) return;
+        
+        document.getElementById('close-time-attack')?.removeEventListener('click', this.closeTimeAttackHandler);
+        document.getElementById('start-time-attack')?.removeEventListener('click', this.startTimeAttackHandler);
+        document.getElementById('resume-time-attack')?.removeEventListener('click', this.resumeTimeAttackHandler);
+        document.getElementById('pause-time-attack')?.removeEventListener('click', this.pauseTimeAttackHandler);
+        document.getElementById('stop-time-attack')?.removeEventListener('click', this.stopTimeAttackHandler);
+        document.getElementById('restart-time-attack')?.removeEventListener('click', this.restartTimeAttackHandler);
+        document.getElementById('back-to-setup')?.removeEventListener('click', this.backToSetupHandler);
+        document.getElementById('time-attack-modal')?.removeEventListener('click', this.timeAttackModalClickHandler);
+        
+        this.timeAttackEventListenersSetup = false;
+    }
+    
+    showTimeAttackScreen(screen) {
+        const screens = ['setup', 'game', 'result'];
+        screens.forEach(s => {
+            const element = document.getElementById(`time-attack-${s}`);
+            if (element) {
+                if (s === screen) {
+                    element.classList.add('active');
+                } else {
+                    element.classList.remove('active');
+                }
+            }
+        });
+    }
+    
+    startTimeAttack() {
+        const timeLimitInput = document.getElementById('time-limit-input');
+        const difficultySelect = document.getElementById('time-attack-difficulty');
+        
+        if (!timeLimitInput || !difficultySelect) return;
+        
+        const timeLimit = parseInt(timeLimitInput.value);
+        if (isNaN(timeLimit) || timeLimit < 1 || timeLimit > 60) {
+            alert('制限時間は1分～60分で設定してください');
+            return;
+        }
+        
+        this.timeAttackDuration = timeLimit * 60;
+        this.timeAttackDifficulty = difficultySelect.value;
+        this.timeAttackBoardsCleared = 0;
+        this.timeAttackBoardTimes = [];
+        this.timeAttackPaused = false;
+        this.timeAttackPausedTime = 0;
+        
+        this.timeAttackStartTime = Date.now();
+        this.timeAttackBoardStartTime = Date.now();
+        
+        this.timeAttackMode = true;
+        
+        this.startTimeAttackTimer();
+        this.showTimeAttackScreen('game');
+        
+        this.startNewTimeAttackBoard();
+        this.updateTimeAttackDisplay();
+    }
+    
+    startNewTimeAttackBoard() {
+        this.timeAttackBoardStartTime = Date.now();
+        
+        const difficultySettings = this.getDifficultySettings(this.timeAttackDifficulty);
+        this.setDifficulty(this.timeAttackDifficulty);
+        this.resetGame();
+    }
+    
+    startTimeAttackTimer() {
+        this.timeAttackTimer = setInterval(() => {
+            if (this.timeAttackPaused) return;
+            
+            this.updateTimeAttackDisplay();
+            
+            const elapsed = (Date.now() - this.timeAttackStartTime - this.timeAttackPausedTime) / 1000;
+            if (elapsed >= this.timeAttackDuration) {
+                this.endTimeAttack();
+            }
+        }, 100);
+    }
+    
+    updateTimeAttackDisplay() {
+        if (!this.timeAttackMode) return;
+        
+        const elapsed = (Date.now() - this.timeAttackStartTime - this.timeAttackPausedTime) / 1000;
+        const remaining = Math.max(0, this.timeAttackDuration - elapsed);
+        
+        const minutes = Math.floor(remaining / 60);
+        const seconds = Math.floor(remaining % 60);
+        
+        const timerDisplay = document.getElementById('time-attack-timer');
+        const boardsClearedDisplay = document.getElementById('boards-cleared');
+        
+        if (timerDisplay) {
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (remaining <= 30 && remaining > 10) {
+                timerDisplay.style.color = '#ff9800';
+            } else if (remaining <= 10) {
+                timerDisplay.style.color = '#f44336';
+            } else {
+                timerDisplay.style.color = '';
+            }
+        }
+        
+        if (boardsClearedDisplay) {
+            boardsClearedDisplay.textContent = this.timeAttackBoardsCleared;
+        }
+    }
+    
+    pauseTimeAttack() {
+        if (!this.timeAttackMode || this.timeAttackPaused) return;
+        
+        this.timeAttackPaused = true;
+        this.timeAttackPauseStart = Date.now();
+        this.pauseTimer();
+        
+        const pauseBtn = document.getElementById('pause-time-attack');
+        const resumeBtn = document.getElementById('resume-time-attack');
+        
+        if (pauseBtn) pauseBtn.style.display = 'none';
+        if (resumeBtn) resumeBtn.style.display = 'inline-block';
+        
+        this.showTimeAttackScreen('setup');
+    }
+    
+    resumeTimeAttack() {
+        if (!this.timeAttackMode || !this.timeAttackPaused) return;
+        
+        this.timeAttackPausedTime += Date.now() - this.timeAttackPauseStart;
+        this.timeAttackPaused = false;
+        this.resumeTimer();
+        
+        const pauseBtn = document.getElementById('pause-time-attack');
+        const resumeBtn = document.getElementById('resume-time-attack');
+        
+        if (pauseBtn) pauseBtn.style.display = 'inline-block';
+        if (resumeBtn) resumeBtn.style.display = 'none';
+        
+        this.showTimeAttackScreen('game');
+    }
+    
+    stopTimeAttack() {
+        if (!this.timeAttackMode) return;
+        
+        this.endTimeAttack();
+    }
+    
+    endTimeAttack() {
+        this.timeAttackMode = false;
+        
+        if (this.timeAttackTimer) {
+            clearInterval(this.timeAttackTimer);
+            this.timeAttackTimer = null;
+        }
+        
+        this.stopTimer();
+        
+        this.saveTimeAttackRecord();
+        this.showTimeAttackResults();
+    }
+    
+    showTimeAttackResults() {
+        this.showTimeAttackScreen('result');
+        
+        const timeLimitDisplay = document.getElementById('result-time-limit');
+        const boardsClearedDisplay = document.getElementById('result-boards-cleared');
+        const avgTimeDisplay = document.getElementById('result-avg-time');
+        const newRecordDisplay = document.getElementById('new-record-display');
+        
+        if (timeLimitDisplay) {
+            timeLimitDisplay.textContent = `${this.timeAttackDuration / 60}分`;
+        }
+        
+        if (boardsClearedDisplay) {
+            boardsClearedDisplay.textContent = this.timeAttackBoardsCleared;
+        }
+        
+        if (avgTimeDisplay && this.timeAttackBoardTimes.length > 0) {
+            const avgTime = this.timeAttackBoardTimes.reduce((a, b) => a + b, 0) / this.timeAttackBoardTimes.length;
+            avgTimeDisplay.textContent = `${avgTime.toFixed(1)}秒`;
+        } else if (avgTimeDisplay) {
+            avgTimeDisplay.textContent = '-';
+        }
+        
+        const isNewRecord = this.isNewTimeAttackRecord();
+        if (newRecordDisplay) {
+            newRecordDisplay.style.display = isNewRecord ? 'block' : 'none';
+        }
+    }
+    
+    restartTimeAttack() {
+        this.showTimeAttackScreen('setup');
+    }
+    
+    saveTimeAttackRecord() {
+        const key = `minesweeper-pro-time-attack-${this.timeAttackDifficulty}`;
+        const currentRecord = localStorage.getItem(key);
+        let bestRecord = currentRecord ? parseInt(currentRecord) : 0;
+        
+        if (this.timeAttackBoardsCleared > bestRecord) {
+            localStorage.setItem(key, this.timeAttackBoardsCleared.toString());
+        }
+    }
+    
+    isNewTimeAttackRecord() {
+        const key = `minesweeper-pro-time-attack-${this.timeAttackDifficulty}`;
+        const currentRecord = localStorage.getItem(key);
+        const bestRecord = currentRecord ? parseInt(currentRecord) : 0;
+        
+        return this.timeAttackBoardsCleared > bestRecord;
+    }
+    
+    updateTimeAttackRecord() {
+        const difficultySelect = document.getElementById('time-attack-difficulty');
+        const recordDisplay = document.getElementById('best-record-text');
+        
+        if (!difficultySelect || !recordDisplay) return;
+        
+        const difficulty = difficultySelect.value;
+        const key = `minesweeper-pro-time-attack-${difficulty}`;
+        const record = localStorage.getItem(key);
+        
+        if (record && parseInt(record) > 0) {
+            recordDisplay.textContent = `${record}面クリア`;
+        } else {
+            recordDisplay.textContent = '記録なし';
+        }
+        
+        difficultySelect.addEventListener('change', () => {
+            this.updateTimeAttackRecord();
+        });
+    }
+    
 }
 
 // ゲームの初期化
