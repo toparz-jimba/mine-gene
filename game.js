@@ -156,6 +156,17 @@ class PCProMinesweeper extends PCMinesweeper {
                 }
             }
         }
+
+        // 時間制限モード安全な初期クリック設定
+        const safeFirstClickSetting = localStorage.getItem('minesweeper-pro-time-attack-safe-first-click');
+        const safeFirstClickCheckbox = document.getElementById('safe-first-click');
+        if (safeFirstClickCheckbox) {
+            if (safeFirstClickSetting === 'false') {
+                safeFirstClickCheckbox.checked = false;
+            } else {
+                safeFirstClickCheckbox.checked = true; // デフォルトはtrue
+            }
+        }
     }
     
     // インポート盤面用タイマー開始処理
@@ -218,6 +229,61 @@ class PCProMinesweeper extends PCMinesweeper {
     }
     
     // オーバーライドメソッド
+    // 地雷配置（時間制限モードでの安全な初期クリック設定に対応）
+    placeMines(excludeRow, excludeCol) {
+        // 時間制限モードで安全な初期クリック設定が無効の場合は、通常の地雷配置
+        if (this.timeAttackMode && !this.timeAttackSafeFirstClick) {
+            // 完全にランダムな地雷配置（初期位置を除外しない）
+            let minesPlaced = 0;
+            while (minesPlaced < this.totalMines) {
+                const row = Math.floor(Math.random() * this.rows);
+                const col = Math.floor(Math.random() * this.cols);
+                
+                if (this.board[row][col] !== -1) {
+                    this.board[row][col] = -1;
+                    minesPlaced++;
+                    
+                    // 周囲のセルの数字を更新
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const newRow = row + dr;
+                            const newCol = col + dc;
+                            if (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] !== -1) {
+                                this.board[newRow][newCol]++;
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // 通常の地雷配置（初期位置の3×3エリアを除外）
+            let minesPlaced = 0;
+            while (minesPlaced < this.totalMines) {
+                const row = Math.floor(Math.random() * this.rows);
+                const col = Math.floor(Math.random() * this.cols);
+                
+                // 初期クリック位置の3×3エリア内かチェック
+                const isInSafeArea = Math.abs(row - excludeRow) <= 1 && Math.abs(col - excludeCol) <= 1;
+                
+                if (this.board[row][col] !== -1 && !isInSafeArea) {
+                    this.board[row][col] = -1;
+                    minesPlaced++;
+                    
+                    // 周囲のセルの数字を更新
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const newRow = row + dr;
+                            const newCol = col + dc;
+                            if (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] !== -1) {
+                                this.board[newRow][newCol]++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     revealCell(row, col) {
         // インポートした盤面の場合、最初のクリックでタイマーを開始
         this.startTimerIfNeeded('reveal');
@@ -2260,8 +2326,14 @@ this.savedEditorMines = new Set(this.editorMines);
         this.resumeTimeAttackHandler = () => this.resumeTimeAttack();
         this.pauseTimeAttackHandler = () => this.pauseTimeAttack();
         this.stopTimeAttackHandler = () => this.stopTimeAttack();
-        this.restartTimeAttackHandler = () => this.restartTimeAttack();
-        this.backToSetupHandler = () => this.showTimeAttackScreen('setup');
+        this.restartTimeAttackHandler = () => {
+            console.log('[DEBUG] Restart button clicked');
+            this.restartTimeAttack();
+        };
+        this.backToSetupHandler = () => {
+            console.log('[DEBUG] Back to setup button clicked');
+            this.showTimeAttackScreen('setup');
+        };
         
         this.timeAttackModalClickHandler = (e) => {
             const modal = document.getElementById('time-attack-modal');
@@ -2312,8 +2384,9 @@ this.savedEditorMines = new Set(this.editorMines);
     startTimeAttack() {
         const timeLimitInput = document.getElementById('time-limit-input');
         const difficultySelect = document.getElementById('time-attack-difficulty');
+        const safeFirstClickCheckbox = document.getElementById('safe-first-click');
         
-        if (!timeLimitInput || !difficultySelect) return;
+        if (!timeLimitInput || !difficultySelect || !safeFirstClickCheckbox) return;
         
         const timeLimit = parseInt(timeLimitInput.value);
         if (isNaN(timeLimit) || timeLimit < 1 || timeLimit > 60) {
@@ -2323,6 +2396,7 @@ this.savedEditorMines = new Set(this.editorMines);
         
         this.timeAttackDuration = timeLimit * 60;
         this.timeAttackDifficulty = difficultySelect.value;
+        this.timeAttackSafeFirstClick = safeFirstClickCheckbox.checked;
         this.timeAttackBoardsCleared = 0;
         this.timeAttackBoardTimes = [];
         this.timeAttackPaused = false;
@@ -2333,8 +2407,11 @@ this.savedEditorMines = new Set(this.editorMines);
         
         this.timeAttackMode = true;
         
+        // メイン画面の時間制限モード表示を有効化
+        this.showMainTimeAttackDisplay();
+        
         this.startTimeAttackTimer();
-        this.showTimeAttackScreen('game');
+        this.closeTimeAttackModal();
         
         this.startNewTimeAttackBoard();
         this.updateTimeAttackDisplay();
@@ -2343,19 +2420,37 @@ this.savedEditorMines = new Set(this.editorMines);
     startNewTimeAttackBoard() {
         this.timeAttackBoardStartTime = Date.now();
         
-        const difficultySettings = this.getDifficultySettings(this.timeAttackDifficulty);
-        this.setDifficulty(this.timeAttackDifficulty);
-        this.resetGame();
+        // 難易度設定を直接適用
+        this.currentDifficulty = this.timeAttackDifficulty;
+        const settings = this.difficulties[this.timeAttackDifficulty];
+        
+        console.log('[DEBUG] Time Attack - Starting new board:');
+        console.log('  Difficulty:', this.timeAttackDifficulty);
+        console.log('  Settings:', settings);
+        
+        if (settings) {
+            this.initBoard(settings.rows, settings.cols, settings.mines);
+            this.renderBoard();
+            this.updateMineCount();
+            this.stopTimer();
+            
+            console.log('  Board initialized:', settings.rows + 'x' + settings.cols, 'mines:', settings.mines);
+        } else {
+            console.error('[ERROR] Time Attack - No settings found for difficulty:', this.timeAttackDifficulty);
+        }
     }
     
     startTimeAttackTimer() {
         this.timeAttackTimer = setInterval(() => {
-            if (this.timeAttackPaused) return;
+            if (this.timeAttackPaused || !this.timeAttackMode) return;
             
             this.updateTimeAttackDisplay();
             
             const elapsed = (Date.now() - this.timeAttackStartTime - this.timeAttackPausedTime) / 1000;
             if (elapsed >= this.timeAttackDuration) {
+                // タイマーを即座にクリアしてから終了処理
+                clearInterval(this.timeAttackTimer);
+                this.timeAttackTimer = null;
                 this.endTimeAttack();
             }
         }, 100);
@@ -2369,12 +2464,14 @@ this.savedEditorMines = new Set(this.editorMines);
         
         const minutes = Math.floor(remaining / 60);
         const seconds = Math.floor(remaining % 60);
+        const timeText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
+        // モーダル内の表示を更新
         const timerDisplay = document.getElementById('time-attack-timer');
         const boardsClearedDisplay = document.getElementById('boards-cleared');
         
         if (timerDisplay) {
-            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = timeText;
             
             if (remaining <= 30 && remaining > 10) {
                 timerDisplay.style.color = '#ff9800';
@@ -2387,6 +2484,26 @@ this.savedEditorMines = new Set(this.editorMines);
         
         if (boardsClearedDisplay) {
             boardsClearedDisplay.textContent = this.timeAttackBoardsCleared;
+        }
+        
+        // メイン画面の表示を更新
+        const mainTimerDisplay = document.getElementById('main-time-attack-timer');
+        const mainBoardsClearedDisplay = document.getElementById('main-boards-cleared');
+        
+        if (mainTimerDisplay) {
+            mainTimerDisplay.textContent = timeText;
+            
+            if (remaining <= 30 && remaining > 10) {
+                mainTimerDisplay.style.color = '#ffeb3b';
+            } else if (remaining <= 10) {
+                mainTimerDisplay.style.color = '#ffcdd2';
+            } else {
+                mainTimerDisplay.style.color = '';
+            }
+        }
+        
+        if (mainBoardsClearedDisplay) {
+            mainBoardsClearedDisplay.textContent = this.timeAttackBoardsCleared;
         }
     }
     
@@ -2403,6 +2520,10 @@ this.savedEditorMines = new Set(this.editorMines);
         if (pauseBtn) pauseBtn.style.display = 'none';
         if (resumeBtn) resumeBtn.style.display = 'inline-block';
         
+        // メイン画面の表示を非表示
+        this.hideMainTimeAttackDisplay();
+        
+        this.openTimeAttackModal();
         this.showTimeAttackScreen('setup');
     }
     
@@ -2419,7 +2540,10 @@ this.savedEditorMines = new Set(this.editorMines);
         if (pauseBtn) pauseBtn.style.display = 'inline-block';
         if (resumeBtn) resumeBtn.style.display = 'none';
         
-        this.showTimeAttackScreen('game');
+        // メイン画面の表示を復元
+        this.showMainTimeAttackDisplay();
+        
+        this.closeTimeAttackModal();
     }
     
     stopTimeAttack() {
@@ -2429,17 +2553,32 @@ this.savedEditorMines = new Set(this.editorMines);
     }
     
     endTimeAttack() {
+        if (!this.timeAttackMode) {
+            console.log('[DEBUG] endTimeAttack called but mode already ended');
+            return; // 既に終了している場合は何もしない
+        }
+        
         this.timeAttackMode = false;
         
         if (this.timeAttackTimer) {
             clearInterval(this.timeAttackTimer);
             this.timeAttackTimer = null;
+            console.log('[DEBUG] Time attack timer cleared');
         }
         
         this.stopTimer();
         
+        // メイン画面の時間制限モード表示を非表示
+        this.hideMainTimeAttackDisplay();
+        
+        // ログフラグをリセット
+        this.resultScreenLogged = false;
+        
         this.saveTimeAttackRecord();
+        this.openTimeAttackModal();
         this.showTimeAttackResults();
+        
+        console.log('[DEBUG] Time attack ended - showing results');
     }
     
     showTimeAttackResults() {
@@ -2469,10 +2608,32 @@ this.savedEditorMines = new Set(this.editorMines);
         if (newRecordDisplay) {
             newRecordDisplay.style.display = isNewRecord ? 'block' : 'none';
         }
+        
+        // デバッグログは一度だけ表示
+        if (!this.resultScreenLogged) {
+            const restartBtn = document.getElementById('restart-time-attack');
+            const backBtn = document.getElementById('back-to-setup');
+            console.log('[DEBUG] Result screen buttons:');
+            console.log('  Restart button:', restartBtn ? 'Found' : 'Not found');
+            console.log('  Back button:', backBtn ? 'Found' : 'Not found');
+            console.log('  Event listeners setup:', this.timeAttackEventListenersSetup ? 'Yes' : 'No');
+            this.resultScreenLogged = true;
+        }
     }
     
     restartTimeAttack() {
+        // 時間制限モードを完全にリセット
+        this.timeAttackMode = false;
+        if (this.timeAttackTimer) {
+            clearInterval(this.timeAttackTimer);
+            this.timeAttackTimer = null;
+        }
+        
+        // 設定画面に戻る
         this.showTimeAttackScreen('setup');
+        this.updateTimeAttackRecord();
+        
+        console.log('[DEBUG] Time Attack restarted - back to setup');
     }
     
     saveTimeAttackRecord() {
@@ -2512,6 +2673,49 @@ this.savedEditorMines = new Set(this.editorMines);
         difficultySelect.addEventListener('change', () => {
             this.updateTimeAttackRecord();
         });
+
+        // 安全な初期クリック設定の変更を保存
+        const safeFirstClickCheckbox = document.getElementById('safe-first-click');
+        if (safeFirstClickCheckbox) {
+            safeFirstClickCheckbox.addEventListener('change', () => {
+                localStorage.setItem('minesweeper-pro-time-attack-safe-first-click', safeFirstClickCheckbox.checked.toString());
+            });
+        }
+    }
+    
+    showMainTimeAttackDisplay() {
+        const display = document.getElementById('time-attack-info');
+        if (display) {
+            display.style.display = 'block';
+            
+            // クリックで一時停止できるようにイベントリスナーを追加
+            this.timeAttackInfoClickHandler = () => {
+                if (this.timeAttackMode && !this.timeAttackPaused) {
+                    console.log('[DEBUG] Time attack display clicked - pausing');
+                    this.pauseTimeAttack();
+                }
+            };
+            
+            display.addEventListener('click', this.timeAttackInfoClickHandler);
+            display.style.cursor = 'pointer';
+            display.title = 'クリックで一時停止';
+        }
+    }
+    
+    hideMainTimeAttackDisplay() {
+        const display = document.getElementById('time-attack-info');
+        if (display) {
+            display.style.display = 'none';
+            
+            // イベントリスナーを削除
+            if (this.timeAttackInfoClickHandler) {
+                display.removeEventListener('click', this.timeAttackInfoClickHandler);
+                this.timeAttackInfoClickHandler = null;
+            }
+            
+            display.style.cursor = '';
+            display.title = '';
+        }
     }
     
 }

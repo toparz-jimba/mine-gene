@@ -28,6 +28,20 @@
                 <div class="timer-group">
                     <div class="displays-container">
                         <div class="assist-display-container"></div>
+                        <!-- 時間制限モード表示 -->
+                        <div id="time-attack-info" class="time-attack-info-display" style="display: none;">
+                            <div class="time-attack-remaining">
+                                <span class="time-attack-label">残り時間:</span>
+                                <span id="main-time-attack-timer" class="time-attack-timer-text">05:00</span>
+                            </div>
+                            <div class="time-attack-boards">
+                                <span class="time-attack-label">クリア:</span>
+                                <span id="main-boards-cleared" class="boards-cleared-text">0</span>
+                            </div>
+                            <div class="time-attack-hint">
+                                <span class="hint-text">⏸️ クリックで一時停止</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="info-item">
                         <span class="emoji"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg></span>
@@ -313,6 +327,17 @@
                         <option value="medium">中級 (16×16, 地雷40)</option>
                         <option value="hard">上級 (16×30, 地雷99)</option>
                     </select>
+                </div>
+                
+                <div class="time-attack-setup-section">
+                    <h3>初期位置設定</h3>
+                    <div class="safe-first-click-option">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="safe-first-click" checked>
+                            <span class="checkmark"></span>
+                            初期位置が必ず安全
+                        </label>
+                    </div>
                 </div>
                 
                 <div class="time-attack-setup-section">
