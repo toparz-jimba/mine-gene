@@ -16,6 +16,9 @@ class PCProMinesweeper extends PCMinesweeper {
         // 補助機能の視覚表示設定
         this.assistVisualEnabled = true;
         
+        // 周囲開示操作設定
+        this.singleClickReveal = false;
+        
         // 盤面管理機能
         this.isEditorMode = false;
         this.isEditingFromSavedBoard = false; // 保存済み盤面からの編集かどうか
@@ -76,6 +79,12 @@ class PCProMinesweeper extends PCMinesweeper {
         const assistVisualToggleBtn = document.getElementById('assist-visual-toggle-btn');
         if (assistVisualToggleBtn) {
             assistVisualToggleBtn.addEventListener('click', () => this.toggleAssistVisual());
+        }
+
+        // 周囲開示操作設定ボタン
+        const singleClickRevealToggleBtn = document.getElementById('single-click-reveal-toggle-btn');
+        if (singleClickRevealToggleBtn) {
+            singleClickRevealToggleBtn.addEventListener('click', () => this.toggleSingleClickReveal());
         }
         
         // 盤面管理ボタン
@@ -141,6 +150,19 @@ class PCProMinesweeper extends PCMinesweeper {
             this.calculateAndDisplayAssist();
         }
     }
+
+    // 周囲開示操作設定切り替え
+    toggleSingleClickReveal() {
+        this.singleClickReveal = !this.singleClickReveal;
+        const singleClickRevealToggleBtn = document.getElementById('single-click-reveal-toggle-btn');
+        if (singleClickRevealToggleBtn) {
+            const textElement = singleClickRevealToggleBtn.querySelector('.single-click-reveal-text');
+            if (textElement) {
+                textElement.textContent = this.singleClickReveal ? 'シングルクリック' : 'ダブルクリック';
+            }
+        }
+        localStorage.setItem('minesweeper-pro-single-click-reveal', this.singleClickReveal);
+    }
     
     // 設定の保存と読み込み
     loadSettings() {
@@ -165,6 +187,27 @@ class PCProMinesweeper extends PCMinesweeper {
                 safeFirstClickCheckbox.checked = false;
             } else {
                 safeFirstClickCheckbox.checked = true; // デフォルトはtrue
+            }
+        }
+
+        // 周囲開示操作設定
+        const singleClickRevealSetting = localStorage.getItem('minesweeper-pro-single-click-reveal');
+        const singleClickRevealBtn = document.getElementById('single-click-reveal-toggle-btn');
+        if (singleClickRevealSetting === 'true') {
+            this.singleClickReveal = true;
+            if (singleClickRevealBtn) {
+                const textElement = singleClickRevealBtn.querySelector('.single-click-reveal-text');
+                if (textElement) {
+                    textElement.textContent = 'シングルクリック';
+                }
+            }
+        } else {
+            this.singleClickReveal = false;
+            if (singleClickRevealBtn) {
+                const textElement = singleClickRevealBtn.querySelector('.single-click-reveal-text');
+                if (textElement) {
+                    textElement.textContent = 'ダブルクリック';
+                }
             }
         }
     }
@@ -282,6 +325,38 @@ class PCProMinesweeper extends PCMinesweeper {
                 }
             }
         }
+    }
+
+    // セルのイベントリスナー設定をオーバーライド（シングルクリック対応）
+    setupCellEventListeners(cell, row, col) {
+        // 左クリック
+        cell.addEventListener('click', (e) => {
+            if (this.gameOver) return;
+            
+            if (!this.flagged[row][col]) {
+                // シングルクリック設定が有効で、開示済みセルの場合は周囲開示
+                if (this.singleClickReveal && this.revealed[row][col] && this.board[row][col] > 0) {
+                    this.chordReveal(row, col);
+                } else {
+                    this.revealCell(row, col);
+                }
+            }
+        });
+        
+        // 右クリック
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (!this.gameOver && !this.revealed[row][col]) {
+                this.toggleFlag(row, col);
+            }
+        });
+        
+        // ダブルクリック（シングルクリック設定が無効の場合のみ）
+        cell.addEventListener('dblclick', (e) => {
+            if (!this.singleClickReveal && this.revealed[row][col] && this.board[row][col] > 0) {
+                this.chordReveal(row, col);
+            }
+        });
     }
 
     revealCell(row, col) {
